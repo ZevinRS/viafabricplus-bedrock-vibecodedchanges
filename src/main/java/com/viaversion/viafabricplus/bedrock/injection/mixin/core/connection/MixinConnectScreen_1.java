@@ -24,7 +24,6 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.core.connection;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
-import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.injection.access.IEventLoopGroupHolder;
 import com.viaversion.viafabricplus.injection.access.core.IConnection;
@@ -62,7 +61,9 @@ public abstract class MixinConnectScreen_1 {
 
     @Inject(method = "run", at = @At(value = "INVOKE", target = "Lio/netty/channel/ChannelFuture;syncUninterruptibly()Lio/netty/channel/ChannelFuture;", remap = false, shift = At.Shift.AFTER))
     private void setupBedrockAccount(final CallbackInfo ci, @Local final Connection clientConnection) throws IOException {
-        if (!ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        // Use the version of this connection; the global target version can already be reset by the previous
+        // connection closing, e.g. when a Bedrock server transfers the player
+        if (!BedrockProtocolVersion.BEDROCK_LATEST.equals(((IConnection) clientConnection).viaFabricPlus$getTargetVersion())) {
             return;
         }
 
