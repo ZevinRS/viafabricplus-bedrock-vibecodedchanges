@@ -43,6 +43,7 @@ public final class BedrockFormButton extends Button {
 
     private static final int LINE_HEIGHT = 10;
     private static final int PADDING = 10;
+    private static final int MAX_LINES = 3;
 
     private final List<FormattedCharSequence> lines;
     private final boolean label;
@@ -83,6 +84,24 @@ public final class BedrockFormButton extends Button {
         return lines;
     }
 
+    /**
+     * Long button texts are usually shown partially by servers' custom Bedrock UIs, with the rest in a tooltip.
+     * Keep the first paragraph on the button and move the full text into the tooltip.
+     *
+     * @return the first paragraph, or null if the text is short enough to show completely
+     */
+    private static @Nullable List<FormattedCharSequence> firstParagraph(final Font font, final List<FormattedCharSequence> lines) {
+        if (lines.size() <= MAX_LINES) {
+            return null;
+        }
+        for (int i = 1; i < lines.size(); i++) {
+            if (font.width(lines.get(i)) == 0) {
+                return lines.subList(0, i);
+            }
+        }
+        return null;
+    }
+
     public static final class Builder extends Button.Builder {
 
         private final Component message;
@@ -100,9 +119,15 @@ public final class BedrockFormButton extends Button {
 
         @Override
         public Button build() {
+            final Font font = Minecraft.getInstance().font;
             final boolean label = this.tooltip != null && BedrockForms.isFakeButton(this.tooltip);
-            final Button button = new BedrockFormButton(this.width, split(Minecraft.getInstance().font, this.message, this.width), this.message, this.onPress, label);
-            if (this.tooltip != null && !label) {
+            final List<FormattedCharSequence> lines = split(font, this.message, this.width);
+            final List<FormattedCharSequence> paragraph = label ? null : firstParagraph(font, lines);
+
+            final Button button = new BedrockFormButton(this.width, paragraph != null ? paragraph : lines, this.message, this.onPress, label);
+            if (paragraph != null) {
+                button.setTooltip(Tooltip.create(this.message));
+            } else if (this.tooltip != null && !label) {
                 button.setTooltip(Tooltip.create(this.tooltip));
             }
             return button;
