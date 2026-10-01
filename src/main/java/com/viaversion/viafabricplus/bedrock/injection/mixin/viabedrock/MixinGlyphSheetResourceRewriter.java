@@ -22,34 +22,25 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 
-import com.viaversion.viaversion.libs.gson.JsonObject;
+import com.viaversion.viafabricplus.bedrock.protocoltranslator.resourcepack.BedrockGlyphSheets;
+import net.raphimc.viabedrock.api.resourcepack.content.Content;
 import net.raphimc.viabedrock.protocol.rewriter.resourcepack.GlyphSheetResourceRewriter;
+import net.raphimc.viabedrock.protocol.storage.ResourcePackStorage;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = GlyphSheetResourceRewriter.class, remap = false)
 public abstract class MixinGlyphSheetResourceRewriter {
 
-    @Unique
-    private static final int viaFabricPlusBedrock$GLYPH_HEIGHT = 8;
-
-    @Unique
-    private static final int viaFabricPlusBedrock$GLYPH_ASCENT = 7;
-
     /**
-     * ViaBedrock sizes glyphs by the pixel size of the sheet cells, so high resolution sheets render huge and sheets
-     * with cells smaller than 5 pixels fail to load with the whole font file. Bedrock draws every glyph cell at the
-     * same size regardless of the sheet resolution, so use the size and baseline of normal text instead.
+     * ViaBedrock's conversion leaves the empty space left of each glyph in its cell, which Java counts as glyph width,
+     * and produces an invalid font (discarding every glyph of the pack) for sheets with cells smaller than 10 pixels.
      */
-    @Redirect(method = "handleGlyphSheets", at = @At(value = "INVOKE", target = "Lcom/viaversion/viaversion/libs/gson/JsonObject;addProperty(Ljava/lang/String;Ljava/lang/Number;)V"))
-    private void useTextGlyphSize(final JsonObject glyphPage, final String property, final Number value) {
-        switch (property) {
-            case "height" -> glyphPage.addProperty(property, viaFabricPlusBedrock$GLYPH_HEIGHT);
-            case "ascent" -> glyphPage.addProperty(property, viaFabricPlusBedrock$GLYPH_ASCENT);
-            default -> glyphPage.addProperty(property, value);
-        }
+    @Inject(method = "handleGlyphSheets", at = @At("HEAD"), cancellable = true)
+    private void convertGlyphSheets(final ResourcePackStorage resourcePackStorage, final CallbackInfoReturnable<Content> cir) {
+        cir.setReturnValue(BedrockGlyphSheets.convert(resourcePackStorage));
     }
 
 }
