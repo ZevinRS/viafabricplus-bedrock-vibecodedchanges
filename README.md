@@ -33,8 +33,7 @@ To join a NetherNet server directly, select the Bedrock version and enter one of
 
 Xbox signaling needs a Bedrock account. HTTP and LAN signaling can connect without one if the server permits it.
 
-The remaining `Bedrock` settings control whether the default Bedrock port is filled in automatically and whether
-ViaBedrock's experimental features are enabled.
+The remaining `Bedrock` setting controls whether the default Bedrock port is filled in automatically.
 
 ## Gradle
 

@@ -24,6 +24,7 @@ package com.viaversion.viafabricplus.bedrock.protocoltranslator.platform;
 import com.viaversion.viaversion.api.Via;
 import java.io.File;
 import java.util.logging.Logger;
+import net.raphimc.viabedrock.ViaBedrockConfig;
 import net.raphimc.viabedrock.platform.ViaBedrockPlatform;
 
 public final class ViaFabricPlusViaBedrockPlatform implements ViaBedrockPlatform {
@@ -32,7 +33,7 @@ public final class ViaFabricPlusViaBedrockPlatform implements ViaBedrockPlatform
 
     public ViaFabricPlusViaBedrockPlatform() {
         this.logger = Via.getPlatform().createLogger("ViaBedrock");
-        this.init(new ViaFabricPlusViaBedrockConfig(new File(this.getDataFolder(), "viabedrock.yml"), this.logger));
+        this.init(new ViaBedrockConfig(new File(this.getDataFolder(), "viabedrock.yml"), this.logger));
     }
 
     @Override

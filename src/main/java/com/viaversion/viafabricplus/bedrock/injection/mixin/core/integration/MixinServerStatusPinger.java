@@ -59,7 +59,7 @@ public abstract class MixinServerStatusPinger {
     @Inject(method = "pingServer", at = @At("HEAD"), cancellable = true)
     private void pingNetherNet(final ServerData data, final Runnable onPersistentDataChange, final Runnable onPongResponse,
                                final EventLoopGroupHolder eventLoopGroupHolder, final CallbackInfo ci) {
-        if (!BedrockProtocolVersion.bedrockLatest.equals(((IServerData) data).viaFabricPlus$forcedVersion())) {
+        if (!BedrockProtocolVersion.BEDROCK_LATEST.equals(((IServerData) data).viaFabricPlus$forcedVersion())) {
             return;
         }
         final SocketAddress address = NetherNetAddressParser.parse(data.ip);
@@ -103,7 +103,7 @@ public abstract class MixinServerStatusPinger {
                     final int maxPlayers = info.get("maxPlayers").getAsInt();
                     data.motd = Component.literal(info.get("name").getAsString());
                     data.version = Component.literal(info.get("version").getAsString());
-                    data.protocol = BedrockProtocolVersion.bedrockLatest.getVersion();
+                    data.protocol = BedrockProtocolVersion.BEDROCK_LATEST.getVersion();
                     data.players = new ServerStatus.Players(maxPlayers, players, List.of());
                     data.status = ServerStatusPinger.formatPlayerCount(players, maxPlayers);
                     data.ping = (System.nanoTime() - start) / 1_000_000L;

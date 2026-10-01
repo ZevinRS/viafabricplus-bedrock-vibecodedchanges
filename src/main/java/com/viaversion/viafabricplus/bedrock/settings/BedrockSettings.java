@@ -34,13 +34,11 @@ import net.raphimc.viabedrock.protocol.data.ProtocolConstants;
 public final class BedrockSettings {
 
     private final BooleanSetting replaceDefaultPort;
-    private final BooleanSetting experimentalFeatures;
 
     public BedrockSettings() {
         final SettingGroup group = ViaFabricPlus.api().settings().register("bedrock");
         group.register("account", new ActionSetting(Component.translatable("bedrock_settings.viafabricplus.account"), BedrockSettings::accountName, () -> ViaFabricPlusBedrock.impl().account().login()));
         this.replaceDefaultPort = group.registerBoolean("replace_default_port", true);
-        this.experimentalFeatures = group.registerBoolean("experimental_features", true);
     }
 
     private static Component accountName() {
@@ -52,7 +50,7 @@ public final class BedrockSettings {
         // The vanilla default port can't simply be replaced because a Bedrock server might be running on it,
         // so only addresses without an explicit port are changed
         if (ViaFabricPlusBedrock.impl().settings().replaceDefaultPort().isActive()
-            && Objects.equals(version, BedrockProtocolVersion.bedrockLatest)
+            && Objects.equals(version, BedrockProtocolVersion.BEDROCK_LATEST)
             && !address.contains(":")) {
             return address + ":" + ProtocolConstants.BEDROCK_DEFAULT_PORT;
         } else {
@@ -62,10 +60,6 @@ public final class BedrockSettings {
 
     public BooleanSetting replaceDefaultPort() {
         return this.replaceDefaultPort;
-    }
-
-    public BooleanSetting experimentalFeatures() {
-        return this.experimentalFeatures;
     }
 
 }
