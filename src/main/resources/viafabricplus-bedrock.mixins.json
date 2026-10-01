@@ -43,6 +43,9 @@
     "features.block.MixinSeaPickleBlock",
     "features.block.MixinTrapDoorBlock",
     "features.misc.MixinClientSuggestionProvider",
+    "features.misc.MixinDialogBodyHandlers_PlainMessageHandler",
+    "features.misc.MixinDialogControlSet",
+    "features.misc.MixinDialogScreen",
     "features.misc.MixinInventoryScreen",
     "features.misc.MixinMinecraft",
     "features.movement.MixinEntity",
@@ -51,7 +54,8 @@
     "features.movement.MixinHoneyBlock",
     "features.movement.MixinLivingEntity",
     "features.movement.MixinLocalPlayer",
-    "features.movement.MixinPlayer"
+    "features.movement.MixinPlayer",
+    "viabedrock.MixinResourcePackLoadStateTracker"
   ],
   "injectors": {
     "defaultRequire": 1
