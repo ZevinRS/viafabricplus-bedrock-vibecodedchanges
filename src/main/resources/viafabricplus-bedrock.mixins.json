@@ -55,6 +55,7 @@
     "features.movement.MixinLivingEntity",
     "features.movement.MixinLocalPlayer",
     "features.movement.MixinPlayer",
+    "viabedrock.MixinGlyphSheetResourceRewriter",
     "viabedrock.MixinResourcePackLoadStateTracker"
   ],
   "injectors": {
