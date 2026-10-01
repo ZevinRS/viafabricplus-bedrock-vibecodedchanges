@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.account;
 
+import com.google.gson.JsonObject;
 import com.mojang.blaze3d.Blaze3D;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.injection.access.IConfirmScreen;
@@ -47,15 +48,28 @@ public final class BedrockAccount {
 
     private static final Component TITLE = Component.nullToEmpty("Microsoft Bedrock login");
 
+    private final Path path;
     private BedrockAuthManager account;
     private Thread thread;
 
     public BedrockAccount(final Path path) {
+        this.path = path;
         JsonSave.load(path, object -> {
             this.account = BedrockAuthManager.fromJson(MinecraftAuth.createHttpClient(), ProtocolConstants.BEDROCK_VERSION_NAME, object);
-        }, () -> {
-            return this.account == null ? null : BedrockAuthManager.toJson(this.account);
-        });
+            this.account.getChangeListeners().add(this::save);
+        }, this::serialize);
+    }
+
+    private @Nullable JsonObject serialize() {
+        return this.account == null ? null : BedrockAuthManager.toJson(this.account);
+    }
+
+    /**
+     * Writes the account right away instead of only in the shutdown hook, so the login and refreshed tokens
+     * aren't lost when the game is killed or crashes.
+     */
+    private synchronized void save() {
+        JsonSave.write(this.path, this::serialize);
     }
 
     public @Nullable BedrockAuthManager get() {
@@ -101,6 +115,8 @@ public final class BedrockAccount {
             account.getMinecraftMultiplayerToken().refreshIfExpired();
             account.getMinecraftCertificateChain().refreshIfExpired();
             this.account = account;
+            account.getChangeListeners().add(this::save);
+            this.save();
             BedrockFriendsService.leaveCurrent();
             BedrockRealmsScreen.invalidate(); // The realms of the previous account no longer apply
 
