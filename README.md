@@ -1,7 +1,8 @@
 # ViaFabricPlus Bedrock
 
-Addon for [ViaFabricPlus](https://github.com/ViaVersion/ViaFabricPlus) that adds Minecraft: Bedrock Edition support back
-to the mod.
+Fork of [ViaFabricPlus-Bedrock](https://github.com/ViaVersionAddons/viafabricplus-bedrock) that adds fixes/qol stuff.
+
+*Vibecoded, while you may use this if you please, be aware it could have horrible optimization issues and such bugs*
 
 ## Usage
 
