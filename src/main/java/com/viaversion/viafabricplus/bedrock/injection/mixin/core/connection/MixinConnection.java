@@ -73,7 +73,6 @@ import net.raphimc.viabedrock.netty.raknet.MessageCodec;
 import net.raphimc.minecraftauth.bedrock.BedrockAuthManager;
 import net.raphimc.minecraftauth.bedrock.model.MinecraftMultiplayerToken;
 import org.cloudburstmc.netty.channel.raknet.RakChannelFactory;
-import org.cloudburstmc.netty.channel.raknet.RakDisconnectReason;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -94,14 +93,6 @@ public abstract class MixinConnection extends SimpleChannelInboundHandler<Packet
         if (BedrockProtocolVersion.BEDROCK_LATEST.equals(((IConnection) this).viaFabricPlus$getTargetVersion())) { // Call channelActive manually when the channel is registered
             this.channelActive(ctx);
         }
-    }
-
-    @Override
-    public void userEventTriggered(final ChannelHandlerContext ctx, final Object evt) throws Exception {
-        if (evt instanceof final RakDisconnectReason reason) { // The client only shows "End of stream" for these
-            ViaFabricPlusBedrock.impl().logger().warn("RakNet session closed: {}", reason);
-        }
-        super.userEventTriggered(ctx, evt);
     }
 
     @WrapWithCondition(method = "channelActive", at = @At(value = "INVOKE", target = "Lio/netty/channel/SimpleChannelInboundHandler;channelActive(Lio/netty/channel/ChannelHandlerContext;)V", remap = false))

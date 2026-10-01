@@ -21,14 +21,19 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.core.access;
 
+import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.injection.access.IRakSessionCodec;
 import io.netty.util.collection.IntObjectMap;
+import org.cloudburstmc.netty.channel.raknet.RakDisconnectReason;
 import org.cloudburstmc.netty.channel.raknet.packet.EncapsulatedPacket;
 import org.cloudburstmc.netty.channel.raknet.packet.RakDatagramPacket;
 import org.cloudburstmc.netty.handler.codec.raknet.common.RakSessionCodec;
 import org.cloudburstmc.netty.util.FastBinaryMinHeap;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = RakSessionCodec.class, remap = false)
 public abstract class MixinRakSessionCodec implements IRakSessionCodec {
@@ -38,6 +43,17 @@ public abstract class MixinRakSessionCodec implements IRakSessionCodec {
 
     @Shadow
     private IntObjectMap<RakDatagramPacket> sentDatagrams;
+
+    @Shadow
+    public abstract boolean isClosed();
+
+    @Inject(method = "close", at = @At("HEAD"))
+    private void logCloseReason(final RakDisconnectReason reason, final CallbackInfo ci) {
+        // The client only shows "End of stream" when the session closes without a Bedrock disconnect packet
+        if (!this.isClosed() && reason != RakDisconnectReason.DISCONNECTED) {
+            ViaFabricPlusBedrock.impl().logger().warn("RakNet session closed: {}", reason);
+        }
+    }
 
     @Override
     public int viaFabricPlusBedrock$getOutgoingPackets() {
