@@ -43,6 +43,7 @@
     "features.block.MixinLadderBlock",
     "features.block.MixinLanternBlock",
     "features.block.MixinLecternBlock",
+    "features.block.MixinMultiPlayerGameMode",
     "features.block.MixinSeaPickleBlock",
     "features.block.MixinTrapDoorBlock",
     "features.misc.MixinButtonListDialogScreen",
