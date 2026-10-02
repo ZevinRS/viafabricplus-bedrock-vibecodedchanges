@@ -61,7 +61,8 @@
     "features.movement.MixinLocalPlayer",
     "features.movement.MixinPlayer",
     "viabedrock.MixinGlyphSheetResourceRewriter",
-    "viabedrock.MixinResourcePackLoadStateTracker"
+    "viabedrock.MixinResourcePackLoadStateTracker",
+    "viabedrock.MixinRespawnGameModeEncoding"
   ],
   "injectors": {
     "defaultRequire": 1
