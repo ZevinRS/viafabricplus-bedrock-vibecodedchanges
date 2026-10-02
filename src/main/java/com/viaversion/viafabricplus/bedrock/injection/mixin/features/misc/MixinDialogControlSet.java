@@ -25,6 +25,7 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.features.misc;
 import com.viaversion.viafabricplus.bedrock.screen.form.BedrockFormButton;
 import com.viaversion.viafabricplus.bedrock.screen.form.BedrockForms;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.function.Supplier;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.dialog.DialogControlSet;
@@ -58,8 +59,15 @@ public abstract class MixinDialogControlSet {
 
         final CommonButtonData data = actionButton.button();
         final Supplier<Optional<ClickEvent>> action = this.bindAction(actionButton.action());
-        final int width = Math.max(data.width(), BedrockForms.width(this.screen.width));
-        cir.setReturnValue(new BedrockFormButton.Builder(data.label(), _ -> this.screen.runAction(action.get()), width, data.tooltip().orElse(null)));
+        final Button.OnPress onPress = _ -> this.screen.runAction(action.get());
+        final OptionalInt buttonId = BedrockForms.buttonId(actionButton);
+        if (buttonId.isPresent() && BedrockForms.useTiles()) {
+            final int width = BedrockForms.tileWidth(this.screen.width);
+            cir.setReturnValue(new BedrockFormButton.Builder(data.label(), onPress, width, null).tile(BedrockForms.buttonImage(buttonId.getAsInt())));
+        } else {
+            final int width = Math.max(data.width(), BedrockForms.width(this.screen.width));
+            cir.setReturnValue(new BedrockFormButton.Builder(data.label(), onPress, width, data.tooltip().orElse(null)));
+        }
     }
 
 }
