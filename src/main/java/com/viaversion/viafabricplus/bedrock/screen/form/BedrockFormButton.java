@@ -51,11 +51,13 @@ public final class BedrockFormButton extends Button {
     private static final int TILE_IMAGE_SIZE = 32;
     private static final int TILE_LINES = 2;
     private static final int TILE_HEIGHT = TILE_MARGIN + TILE_IMAGE_SIZE + 3 + TILE_LINES * LINE_HEIGHT + TILE_MARGIN;
+    private static final int HOVER_TEXT_WIDTH = 150; // Maximum width of the hover text in custom form layouts
 
     private final List<FormattedCharSequence> lines;
     private final boolean label;
     private final boolean tile;
     private final @Nullable FormImage image;
+    private @Nullable List<FormattedCharSequence> hoverText;
 
     private BedrockFormButton(final int width, final int height, final List<FormattedCharSequence> lines, final Component message, final OnPress onPress, final boolean label, final boolean tile, final @Nullable FormImage image) {
         super(0, 0, width, height, message, onPress, DEFAULT_NARRATION);
@@ -91,6 +93,10 @@ public final class BedrockFormButton extends Button {
         for (final FormattedCharSequence line : this.lines) {
             output.accept(TextAlignment.CENTER, centerX, y, line);
             y += LINE_HEIGHT;
+        }
+
+        if (this.hoverText != null && this.isHovered()) { // Widget tooltips stay next to the widget, custom layouts follow the cursor
+            graphics.setTooltipForNextFrame(this.hoverText, mouseX, mouseY);
         }
     }
 
@@ -139,8 +145,9 @@ public final class BedrockFormButton extends Button {
 
             final Button button;
             if (this.tile) {
-                button = new BedrockFormButton(this.width, TILE_HEIGHT, lines.subList(0, Math.min(TILE_LINES, lines.size())), this.message, this.onPress, false, true, this.image);
-                button.setTooltip(Tooltip.create(this.message));
+                final BedrockFormButton tile = new BedrockFormButton(this.width, TILE_HEIGHT, lines.subList(0, Math.min(TILE_LINES, lines.size())), this.message, this.onPress, false, true, this.image);
+                tile.hoverText = font.split(this.message, HOVER_TEXT_WIDTH);
+                button = tile;
             } else {
                 button = new BedrockFormButton(this.width, Math.max(DEFAULT_HEIGHT, lines.size() * LINE_HEIGHT + PADDING), lines, this.message, this.onPress, label, false, null);
                 if (this.tooltip != null && !label) {
