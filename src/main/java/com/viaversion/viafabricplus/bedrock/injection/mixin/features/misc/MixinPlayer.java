@@ -21,9 +21,11 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.misc;
 
+import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.viaversion.viafabricplus.bedrock.building.BedrockBuilding;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -31,6 +33,20 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(Player.class)
 public abstract class MixinPlayer {
+
+    /**
+     * Java slows the attacker and stops sprinting when a fully charged attack knocks back. Bedrock has its own rule for
+     * the attacker, see {@link com.viaversion.viafabricplus.bedrock.injection.mixin.features.block.MixinMultiPlayerGameMode}.
+     */
+    @WrapWithCondition(method = "causeExtraKnockback", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Player;setDeltaMovement(Lnet/minecraft/world/phys/Vec3;)V"))
+    private boolean skipJavaAttackSlowdown(final Player instance, final Vec3 deltaMovement) {
+        return !BedrockBuilding.isActive();
+    }
+
+    @WrapWithCondition(method = "causeExtraKnockback", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Player;setSprinting(Z)V"))
+    private boolean skipJavaAttackSprintReset(final Player instance, final boolean sprinting) {
+        return !BedrockBuilding.isActive();
+    }
 
     @Inject(method = "blockInteractionRange", at = @At("HEAD"), cancellable = true)
     private void bedrockPickRange(final CallbackInfoReturnable<Double> cir) {
