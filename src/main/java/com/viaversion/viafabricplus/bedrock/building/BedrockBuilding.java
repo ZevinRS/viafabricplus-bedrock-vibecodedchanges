@@ -164,7 +164,7 @@ public final class BedrockBuilding {
         final Vec3 posDelta = posDelta(player);
         if (this.hasLastBuiltPosition && posDelta.lengthSqr() > MIN_MOVE_DELTA_SQR && !player.isShiftKeyDown()) {
             this.branch = "move";
-            this.continueBuild(minecraft, player, this.lastBuiltPosition, Direction.getApproximateNearest(posDelta));
+            this.continueBuild(minecraft, player, this.lastBuiltPosition, facingFromVec3(posDelta));
         } else {
             this.branch = "aim";
             this.continueBuild(minecraft, player, hit.getBlockPos(), hit.getDirection());
@@ -214,7 +214,7 @@ public final class BedrockBuilding {
                         this.hasBuildDirection = true;
                         this.nextBuildPosition = placePos;
                         this.buildDirection = delta;
-                        this.continueFacing = Direction.getApproximateNearest(delta.getX(), delta.getY(), delta.getZ());
+                        this.continueFacing = facingFromVec3(Vec3.atLowerCornerOf(delta));
                     }
                 }
             } else if (!this.hasLastBuiltPosition) {
@@ -251,6 +251,26 @@ public final class BedrockBuilding {
             }
         }
         return true;
+    }
+
+    /**
+     * Bedrock's Facing::fromVec3. Unlike Java's Direction#getApproximateNearest, a vertical facing needs the Y axis to be
+     * strictly the largest, so ties (common while sprint jumping) resolve to a horizontal facing.
+     */
+    private static Direction facingFromVec3(final Vec3 vec) {
+        final double x = Math.abs(vec.x);
+        final double y = Math.abs(vec.y);
+        final double z = Math.abs(vec.z);
+        if (x * x + y * y + z * z <= MIN_MOVE_DELTA_SQR) {
+            return Direction.UP;
+        }
+        if (x < y && z < y) {
+            return vec.y > 0.0 ? Direction.UP : Direction.DOWN;
+        }
+        if (y < x && z < x) {
+            return vec.x > 0.0 ? Direction.EAST : Direction.WEST;
+        }
+        return vec.z > 0.0 ? Direction.SOUTH : Direction.NORTH;
     }
 
     private static Vec3 posDelta(final LocalPlayer player) {
