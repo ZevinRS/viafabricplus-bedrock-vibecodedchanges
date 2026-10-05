@@ -24,6 +24,8 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.building.BedrockInputReplay;
+import net.minecraft.client.Minecraft;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
@@ -83,6 +85,16 @@ public abstract class MixinEntity {
             return box.inflate(0, -0.4, 0);
         } else {
             return box;
+        }
+    }
+
+    /**
+     * The mouse doesn't turn the player while an input replay sets the rotation of every tick.
+     */
+    @Inject(method = "turn", at = @At("HEAD"), cancellable = true)
+    private void keepReplayRotation(final double yaw, final double pitch, final CallbackInfo ci) {
+        if (BedrockInputReplay.isPlaying() && (Object) this == Minecraft.getInstance().player) {
+            ci.cancel();
         }
     }
 

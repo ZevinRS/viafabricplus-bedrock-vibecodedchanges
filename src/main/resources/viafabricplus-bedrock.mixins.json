@@ -59,6 +59,7 @@
     "features.movement.MixinEntityFluidInteraction",
     "features.movement.MixinEntityFluidInteraction_CurrentAccumulator",
     "features.movement.MixinHoneyBlock",
+    "features.movement.MixinKeyboardInput",
     "features.movement.MixinLivingEntity",
     "features.movement.MixinLocalPlayer",
     "features.movement.MixinPlayer",
