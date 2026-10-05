@@ -35,9 +35,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.ConnectScreen;
+import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.phys.Vec2;
+import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 
 /**
@@ -46,12 +51,20 @@ import net.raphimc.viabedrock.protocol.storage.EntityTracker;
  * started with F7. The file holds the start position and one frame per tick: yaw, pitch and the held keys as letters
  * (F forward, B backward, L left, R right, J jump, S sneak, P sprint). Servers without a tp command can teleport
  * through chat with -Dviafabricplus.bedrock.inputReplayTeleport=chat, which sends "!tp x y z".
+ * With -Dviafabricplus.bedrock.inputReplayAuto=host:port the client joins that server from the title screen, plays the
+ * replay once the world loaded and closes the game afterwards, so runs need no one at the keyboard.
  */
 public final class BedrockInputReplay {
 
     private static final String FILE = System.getProperty("viafabricplus.bedrock.inputReplay");
     private static final boolean TELEPORT_THROUGH_CHAT = "chat".equals(System.getProperty("viafabricplus.bedrock.inputReplayTeleport"));
     private static final int TELEPORT_WAIT_TICKS = 40;
+    private static final String AUTO_SERVER = System.getProperty("viafabricplus.bedrock.inputReplayAuto");
+    private static final int AUTO_START_TICKS = 100;
+    private static final int AUTO_QUIT_TICKS = 40;
+
+    private static boolean autoConnected;
+    private static int autoTicks;
 
     private static State state = State.IDLE;
     private static boolean keyWasDown;
@@ -75,8 +88,29 @@ public final class BedrockInputReplay {
      * Called at the end of every client tick.
      */
     public static void tick(final Minecraft minecraft) {
-        if (FILE == null || minecraft.player == null) {
+        if (FILE == null) {
             return;
+        }
+        if (AUTO_SERVER != null && !autoConnected && minecraft.gui.screen() instanceof TitleScreen screen) {
+            autoConnected = true;
+            ViaFabricPlus.api().setTargetVersion(BedrockProtocolVersion.BEDROCK_LATEST);
+            final ServerData server = new ServerData("Replay", AUTO_SERVER, ServerData.Type.OTHER);
+            // Nobody is there to answer the resource pack prompt
+            server.setResourcePackStatus(ServerData.ServerPackStatus.DISABLED);
+            ConnectScreen.startConnecting(screen, minecraft, ServerAddress.parseString(AUTO_SERVER), server, false, null);
+        }
+        if (minecraft.player == null) {
+            return;
+        }
+        if (AUTO_SERVER != null) {
+            // Counts up to the start while idle, then again from 0 once the replay is done
+            if (state == State.IDLE && ++autoTicks == AUTO_START_TICKS) {
+                begin(minecraft.player);
+                autoTicks = 0;
+            } else if (state == State.DONE && ++autoTicks == AUTO_QUIT_TICKS) {
+                ViaFabricPlusBedrock.impl().logger().info("[replay] closing the game");
+                minecraft.stop();
+            }
         }
         final boolean keyDown = InputConstants.isKeyDown(InputConstants.KEY_F7);
         if (keyDown && !keyWasDown && minecraft.gui.screen() == null) {
@@ -89,6 +123,10 @@ public final class BedrockInputReplay {
         }
         keyWasDown = keyDown;
 
+        if (state == State.PLAYING && minecraft.player.isDeadOrDying()) {
+            ViaFabricPlusBedrock.impl().logger().info("[replay] died at frame {}", frameIndex);
+            state = State.DONE;
+        }
         if (state == State.TELEPORTING && --waitTicks <= 0) {
             frameIndex = 0;
             state = State.PLAYING;
