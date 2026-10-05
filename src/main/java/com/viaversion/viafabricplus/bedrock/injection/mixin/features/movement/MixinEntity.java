@@ -21,14 +21,20 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 
+import com.google.common.collect.ImmutableList;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.building.BedrockInputReplay;
 import com.viaversion.viafabricplus.bedrock.building.BedrockSprint;
-import net.minecraft.client.Minecraft;
 import com.viaversion.viaversion.api.connection.UserConnection;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.Direction;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
@@ -37,15 +43,13 @@ import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
-import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import org.spongepowered.asm.mixin.Unique;
-import net.minecraft.world.entity.MoverType;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(Entity.class)
 public abstract class MixinEntity {
@@ -144,6 +148,18 @@ public abstract class MixinEntity {
             BedrockInputReplay.frameIndex() - 1, movement.x, movement.y, movement.z,
             collided != null ? collided.x : Double.NaN, collided != null ? collided.y : Double.NaN, collided != null ? collided.z : Double.NaN,
             velocity.x, velocity.y, velocity.z, entity.onGround(), entity.horizontalCollision, entity.minorHorizontalCollision, entity.verticalCollision));
+    }
+
+    @Unique
+    private static final ImmutableList<Direction.Axis> BEDROCK_AXIS_ORDER = ImmutableList.of(Direction.Axis.Y, Direction.Axis.X, Direction.Axis.Z);
+
+    /**
+     * Java collides along the larger horizontal axis first, Bedrock always along X before Z. Found with the input replay:
+     * sliding forward past the end of a wall freed the sideways movement on Java a tick before Bedrock.
+     */
+    @WrapOperation(method = "collideWithShapes", at = @At(value = "INVOKE", target = "Lnet/minecraft/core/Direction;axisStepOrder(Lnet/minecraft/world/phys/Vec3;)Lcom/google/common/collect/ImmutableList;"))
+    private static ImmutableList<Direction.Axis> bedrockAxisOrder(final Vec3 movement, final Operation<ImmutableList<Direction.Axis>> original) {
+        return ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) ? BEDROCK_AXIS_ORDER : original.call(movement);
     }
 
 }
