@@ -23,7 +23,11 @@ package com.viaversion.viafabricplus.bedrock.building;
 
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
+import com.viaversion.viaversion.api.connection.UserConnection;
+import java.util.Iterator;
 import java.util.Optional;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
@@ -41,6 +45,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
+import net.raphimc.viabedrock.protocol.model.Position3f;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -68,6 +73,10 @@ public final class BedrockBuilding {
     private static final boolean DEBUG = Boolean.getBoolean("viafabricplus.bedrock.debugBuilding");
 
     private static final BedrockBuilding INSTANCE = new BedrockBuilding();
+
+    // Placements made by holding use, so they are sent like Bedrock's simulation_tick placements
+    private static final Queue<SimulatedPlacement> SIMULATED_PLACEMENTS = new ConcurrentLinkedQueue<>();
+    private static final long SIMULATED_PLACEMENT_TIMEOUT_NANOS = 1_000_000_000L;
 
     // Whether the click that starts holding use was handled. Java sets the use key down as soon as it's pressed, but only
     // handles the click on the next tick, so building would otherwise start before the click and place an extra block.
@@ -114,6 +123,12 @@ public final class BedrockBuilding {
     }
 
     public void stopBuild() {
+        if (this.building) {
+            final UserConnection connection = ViaFabricPlus.api().userConnection();
+            if (connection != null && isActive()) {
+                BedrockPlacementTranslator.stopUsingItemOn(connection);
+            }
+        }
         this.building = false;
         this.hasBuildDirection = false;
         this.hasLastBuiltPosition = false;
@@ -170,7 +185,7 @@ public final class BedrockBuilding {
             final Vec3 segmentEnd = hitBlock ? hit.getLocation() : rayEnd;
             if (intersects(new AABB(this.nextBuildPosition), eye, segmentEnd)) {
                 this.branch = "line";
-                this.continueBuild(minecraft, player, this.nextBuildPosition.subtract(this.buildDirection), this.continueFacing);
+                this.continueBuild(minecraft, player, this.nextBuildPosition.subtract(this.buildDirection), this.continueFacing, hitBlock ? hit.getLocation() : null);
             }
             return;
         }
@@ -181,17 +196,19 @@ public final class BedrockBuilding {
         final Vec3 posDelta = posDelta(player);
         if (this.hasLastBuiltPosition && posDelta.lengthSqr() > MIN_MOVE_DELTA_SQR && !player.isShiftKeyDown()) {
             this.branch = "move";
-            this.continueBuild(minecraft, player, this.lastBuiltPosition, facingFromVec3(posDelta));
+            this.continueBuild(minecraft, player, this.lastBuiltPosition, facingFromVec3(posDelta), hit.getLocation());
         } else {
             this.branch = "aim";
-            this.continueBuild(minecraft, player, hit.getBlockPos(), hit.getDirection());
+            this.continueBuild(minecraft, player, hit.getBlockPos(), hit.getDirection(), hit.getLocation());
         }
     }
 
     /**
      * Bedrock's continueBuildBlock: applies the build delay, places the block and updates the build direction.
+     *
+     * @param hitLocation where the look ray hit a block, which Bedrock sends as click position relative to the clicked block
      */
-    private void continueBuild(final Minecraft minecraft, final LocalPlayer player, final BlockPos pos, final Direction face) {
+    private void continueBuild(final Minecraft minecraft, final LocalPlayer player, final BlockPos pos, final Direction face, final @Nullable Vec3 hitLocation) {
         final BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(pos).add(Vec3.atLowerCornerOf(face.getUnitVec3i()).scale(0.5)), face, pos, false);
         final BlockPos placePos = placementPosition(player, InteractionHand.MAIN_HAND, hit);
         if (placePos == null) {
@@ -215,6 +232,9 @@ public final class BedrockBuilding {
             return;
         }
 
+        final Position3f clickPosition = hitLocation == null ? Position3f.ZERO : new Position3f(
+            (float) (hitLocation.x - pos.getX()), (float) (hitLocation.y - pos.getY()), (float) (hitLocation.z - pos.getZ()));
+        SIMULATED_PLACEMENTS.add(new SimulatedPlacement(pos.getX(), pos.getY(), pos.getZ(), face.get3DDataValue(), clickPosition, now));
         final boolean built = this.place(minecraft, player, hit);
         if (DEBUG) {
             final Vec3 delta = posDelta(player);
@@ -268,6 +288,27 @@ public final class BedrockBuilding {
             }
         }
         return true;
+    }
+
+    /**
+     * @return the placement made by holding use for this block and face, or null if it was a click
+     */
+    public static @Nullable SimulatedPlacement pollSimulatedPlacement(final int x, final int y, final int z, final int face) {
+        final long now = System.nanoTime();
+        final Iterator<SimulatedPlacement> iterator = SIMULATED_PLACEMENTS.iterator();
+        while (iterator.hasNext()) {
+            final SimulatedPlacement placement = iterator.next();
+            if (now - placement.time() > SIMULATED_PLACEMENT_TIMEOUT_NANOS) {
+                iterator.remove();
+            } else if (placement.x() == x && placement.y() == y && placement.z() == z && placement.face() == face) {
+                iterator.remove();
+                return placement;
+            }
+        }
+        return null;
+    }
+
+    public record SimulatedPlacement(int x, int y, int z, int face, Position3f clickPosition, long time) {
     }
 
     /**

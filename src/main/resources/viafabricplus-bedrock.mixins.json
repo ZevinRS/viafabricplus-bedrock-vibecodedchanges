@@ -61,6 +61,7 @@
     "features.movement.MixinLivingEntity",
     "features.movement.MixinLocalPlayer",
     "features.movement.MixinPlayer",
+    "viabedrock.MixinBedrockProtocol",
     "viabedrock.MixinGlyphSheetResourceRewriter",
     "viabedrock.MixinResourcePackLoadStateTracker",
     "viabedrock.MixinRespawnGameModeEncoding"
