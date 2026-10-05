@@ -33,7 +33,9 @@ import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
@@ -54,6 +56,15 @@ public abstract class MixinLivingEntity {
         if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) && effect != null) {
             cir.setReturnValue(new Vec3(movement.x, movement.y + (((effect.getAmplifier() + 1) * 0.05) - movement.y) * 0.2, movement.z));
         }
+    }
+
+    /**
+     * Java zeroes velocity components below 0.003 every tick, Bedrock only lets them decay to about 1e-7, as recorded from
+     * the Bedrock client. For example, a small sideways speed while running against a wall carries into a jump on Bedrock.
+     */
+    @ModifyConstant(method = "aiStep", constant = @Constant(doubleValue = 0.003))
+    private double bedrockVelocityCutoff(final double cutoff) {
+        return ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) ? 1.0E-7 : cutoff;
     }
 
 }
