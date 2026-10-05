@@ -22,6 +22,7 @@
 package com.viaversion.viafabricplus.bedrock.building;
 
 import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import java.util.Optional;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
@@ -63,6 +64,9 @@ public final class BedrockBuilding {
     private static final long MAX_LAG_NANOS = 180_000_000L;
     private static final float MIN_MOVING_NON_CREATIVE_BUILD_DELAY = 100.0F;
 
+    // Logs every building decision, for comparing against recordings of the Bedrock client
+    private static final boolean DEBUG = Boolean.getBoolean("viafabricplus.bedrock.debugBuilding");
+
     private static final BedrockBuilding INSTANCE = new BedrockBuilding();
 
     private boolean hasBuildDirection;
@@ -72,6 +76,7 @@ public final class BedrockBuilding {
     private BlockPos nextBuildPosition = BlockPos.ZERO;
     private Direction continueFacing = Direction.NORTH;
     private long lastBuildTime;
+    private String branch = "";
 
     private BedrockBuilding() {
     }
@@ -105,6 +110,9 @@ public final class BedrockBuilding {
      * Called when the click itself placed a block, which Bedrock remembers as the last built position.
      */
     public void onBlockPlaced(final BlockPos pos) {
+        if (DEBUG) {
+            ViaFabricPlusBedrock.impl().logger().info("[build] click placed {}", pos.toShortString());
+        }
         this.lastBuiltPosition = pos;
         this.hasLastBuiltPosition = true;
         this.lastBuildTime = System.nanoTime();
@@ -144,6 +152,7 @@ public final class BedrockBuilding {
         if (this.hasBuildDirection) {
             final Vec3 segmentEnd = hitBlock ? hit.getLocation() : rayEnd;
             if (intersects(new AABB(this.nextBuildPosition), eye, segmentEnd)) {
+                this.branch = "line";
                 this.continueBuild(minecraft, player, this.nextBuildPosition.subtract(this.buildDirection), this.continueFacing);
             }
             return;
@@ -154,8 +163,10 @@ public final class BedrockBuilding {
 
         final Vec3 posDelta = posDelta(player);
         if (this.hasLastBuiltPosition && posDelta.lengthSqr() > MIN_MOVE_DELTA_SQR && !player.isShiftKeyDown()) {
+            this.branch = "move";
             this.continueBuild(minecraft, player, this.lastBuiltPosition, Direction.getApproximateNearest(posDelta));
         } else {
+            this.branch = "aim";
             this.continueBuild(minecraft, player, hit.getBlockPos(), hit.getDirection());
         }
     }
@@ -188,6 +199,13 @@ public final class BedrockBuilding {
         }
 
         final boolean built = this.place(minecraft, player, hit);
+        if (DEBUG) {
+            final Vec3 delta = posDelta(player);
+            ViaFabricPlusBedrock.impl().logger().info("[build] {} {} {} -> {} built={} delay={} delta=({}, {}, {}) dir={} pitch={}",
+                this.branch, pos.toShortString(), face, placePos.toShortString(), built, (int) delay,
+                String.format("%.2f", delta.x), String.format("%.2f", delta.y), String.format("%.2f", delta.z),
+                this.hasBuildDirection ? this.buildDirection.toShortString() : "-", String.format("%.1f", player.getXRot()));
+        }
         if (!sneaking) {
             if (!this.hasBuildDirection) {
                 if (this.hasLastBuiltPosition) {
