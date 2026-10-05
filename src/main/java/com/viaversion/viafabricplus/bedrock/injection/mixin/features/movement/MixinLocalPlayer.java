@@ -22,6 +22,8 @@
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.building.BedrockSprint;
 import com.viaversion.viafabricplus.bedrock.building.BedrockItemUse;
@@ -59,6 +61,15 @@ public abstract class MixinLocalPlayer {
     @ModifyExpressionValue(method = "shouldStopRunSprinting", at = @At(value = "FIELD", target = "Lnet/minecraft/client/player/LocalPlayer;minorHorizontalCollision:Z"))
     private boolean noMinorCollisionOnBedrock(final boolean minorHorizontalCollision) {
         return !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) && minorHorizontalCollision;
+    }
+
+    /**
+     * Java scales diagonal input up to the unit square, so moving diagonally is as fast as straight. Bedrock keeps the
+     * normalized input (recorded: diagonal air acceleration 0.026 * 0.98 on Bedrock, 0.026 on Java).
+     */
+    @WrapOperation(method = "modifyInput", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;modifyInputSpeedForSquareMovement(Lnet/minecraft/world/phys/Vec2;)Lnet/minecraft/world/phys/Vec2;"))
+    private Vec2 keepBedrockDiagonalInput(final Vec2 input, final Operation<Vec2> original) {
+        return ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) ? input : original.call(input);
     }
 
     @Inject(method = "modifyInput", at = @At("HEAD"))
