@@ -23,6 +23,8 @@ package com.viaversion.viafabricplus.bedrock.building;
 
 import com.viaversion.viaversion.api.connection.StorableObject;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
 
 /**
@@ -42,6 +44,14 @@ public final class BedrockPlacementState implements StorableObject {
     private int equippedSlot = -1;
     private BedrockItem equippedItem;
     private BedrockItem equippedOffhandItem;
+
+    // Blocks the client placed, until the server updates them. Bedrock sends the clicked block as the client sees it.
+    private final Map<BlockPosition, Integer> predictedBlocks = new LinkedHashMap<>(16, 0.75F, false) {
+        @Override
+        protected boolean removeEldestEntry(final Map.Entry<BlockPosition, Integer> eldest) {
+            return this.size() > 256;
+        }
+    };
 
     public int nextLegacyRequestId() {
         final int id = this.nextLegacyRequestId;
@@ -110,6 +120,18 @@ public final class BedrockPlacementState implements StorableObject {
 
     private static boolean same(final BedrockItem item, final BedrockItem other) {
         return other != null && !item.isDifferent(other) && item.amount() == other.amount();
+    }
+
+    public void predictBlock(final BlockPosition position, final int blockState) {
+        this.predictedBlocks.put(position, blockState);
+    }
+
+    public void onServerBlockChange(final BlockPosition position) {
+        this.predictedBlocks.remove(position);
+    }
+
+    public int blockState(final BlockPosition position, final int serverBlockState) {
+        return this.predictedBlocks.getOrDefault(position, serverBlockState);
     }
 
 }

@@ -62,6 +62,7 @@
     "features.movement.MixinLocalPlayer",
     "features.movement.MixinPlayer",
     "viabedrock.MixinBedrockProtocol",
+    "viabedrock.MixinChunkTracker",
     "viabedrock.MixinGlyphSheetResourceRewriter",
     "viabedrock.MixinInventoryContainer",
     "viabedrock.MixinOffhandContainer",

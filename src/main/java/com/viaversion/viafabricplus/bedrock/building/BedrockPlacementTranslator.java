@@ -135,7 +135,7 @@ public final class BedrockPlacementTranslator {
         final int legacyRequestId = state.nextLegacyRequestId();
         final ItemUseTriggerType trigger = simulated ? ItemUseTriggerType.Simulation_Tick : ItemUseTriggerType.Player_Input;
         final Position3f clickPosition = simulated ? placement.simulatedClickPosition() : javaClickPosition;
-        final int blockRuntimeId = chunkTracker.getBlockState(position);
+        final int blockRuntimeId = state.blockState(position, chunkTracker.getBlockState(position));
 
         if (placement.result() != BedrockBuilding.Placement.Result.SUCCESS) {
             sendTransaction(user, new BedrockInventoryTransaction(0, null, null, ComplexInventoryTransaction_Type.ItemUseTransaction,
@@ -190,6 +190,9 @@ public final class BedrockPlacementTranslator {
             mobEquipment.sendToServer(BedrockProtocol.class);
         }
         state.setLastPlacedPosition(placePosition);
+        if (heldItem.blockRuntimeId() != 0) {
+            state.predictBlock(placePosition, heldItem.blockRuntimeId());
+        }
     }
 
     /**
