@@ -31,10 +31,25 @@ public final class BedrockSprint {
     // The part of the server's movement speed its modifiers don't explain, which Bedrock forgets when its sprint modifier changes
     public static final Identifier SERVER_VALUE_MODIFIER = Identifier.fromNamespaceAndPath("viafabricplus_bedrock", "server_value");
 
+    // Ticks the player has been swimming for since it last started swimming, counting the tick it started in
+    private static int ticksSinceSwimStart;
+
     // Whether the last move of the player didn't move it at all along the axis it mostly tried to move along
     private static boolean mainAxisBlocked;
 
     private BedrockSprint() {
+    }
+
+    public static void onSwimStart() {
+        ticksSinceSwimStart = 0;
+    }
+
+    /**
+     * Called once per tick before the player moves.
+     */
+    public static int tickSwimming(final boolean swimming) {
+        ticksSinceSwimStart = swimming ? ticksSinceSwimStart + 1 : 0;
+        return ticksSinceSwimStart;
     }
 
     public static boolean isMainAxisBlocked() {

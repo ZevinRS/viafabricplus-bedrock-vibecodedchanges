@@ -71,6 +71,9 @@ public abstract class MixinEntity {
         final UserConnection connection = ViaFabricPlus.api().userConnection();
         if (connection != null && swimming != this.isSwimming()) {
             connection.get(EntityTracker.class).getClientPlayer().addAuthInputData(swimming ? PlayerAuthInputData.StartSwimming : PlayerAuthInputData.StopSwimming);
+            if (swimming && (Object) this == Minecraft.getInstance().player) {
+                BedrockSprint.onSwimStart();
+            }
         }
     }
 
@@ -149,12 +152,12 @@ public abstract class MixinEntity {
         final Vec3 collided = this.viaFabricPlusBedrock$replayCollided;
         final Vec3 velocity = entity.getDeltaMovement();
         ViaFabricPlusBedrock.impl().logger().info(String.format(java.util.Locale.ROOT,
-            "[replay-move] frame=%d intended=(%.5f,%.5f,%.5f) collided=(%.5f,%.5f,%.5f) velocity=(%.5f,%.5f,%.5f) onGround=%s horizontal=%s minor=%s vertical=%s speed=%.4f sprinting=%s t=%d",
+            "[replay-move] frame=%d intended=(%.5f,%.5f,%.5f) collided=(%.5f,%.5f,%.5f) velocity=(%.5f,%.5f,%.5f) onGround=%s horizontal=%s minor=%s vertical=%s speed=%.4f sprinting=%s swimming=%s inWater=%s underWater=%s t=%d",
             BedrockInputReplay.frameIndex() - 1, movement.x, movement.y, movement.z,
             collided != null ? collided.x : Double.NaN, collided != null ? collided.y : Double.NaN, collided != null ? collided.z : Double.NaN,
             velocity.x, velocity.y, velocity.z, entity.onGround(), entity.horizontalCollision, entity.minorHorizontalCollision, entity.verticalCollision,
             entity instanceof final LivingEntity living ? living.getAttributeValue(Attributes.MOVEMENT_SPEED) : Double.NaN,
-            entity.isSprinting(), System.currentTimeMillis()));
+            entity.isSprinting(), entity.isSwimming(), entity.isInWater(), entity.isUnderWater(), System.currentTimeMillis()));
     }
 
     @Unique

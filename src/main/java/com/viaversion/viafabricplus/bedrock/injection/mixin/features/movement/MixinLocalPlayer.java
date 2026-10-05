@@ -35,6 +35,7 @@ import net.minecraft.world.phys.Vec2;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(LocalPlayer.class)
@@ -46,6 +47,17 @@ public abstract class MixinLocalPlayer {
     @Redirect(method = {"shouldStopRunSprinting", "canStartSprinting"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;isSprintingPossible(Z)Z"))
     private boolean allowNonSwimWaterSprinting(final LocalPlayer instance, final boolean allowedInShallowWater) {
         return this.isSprintingPossible(allowedInShallowWater || ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) && (instance.isSwimming() || instance.onGround()));
+    }
+
+    /**
+     * Java only starts swimming at the start of the tick, so sprinting off in water swims from the next tick on. Bedrock
+     * swims in the tick the sprint started, as recorded when sprinting off underwater.
+     */
+    @Inject(method = "aiStep", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/AbstractClientPlayer;aiStep()V"))
+    private void swimAfterSprintStart(final CallbackInfo ci) {
+        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            ((LocalPlayer) (Object) this).updateSwimming();
+        }
     }
 
     /**

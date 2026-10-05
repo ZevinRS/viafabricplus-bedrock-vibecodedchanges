@@ -24,8 +24,8 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.ViaFabricPlus;
-import com.viaversion.viafabricplus.bedrock.building.BedrockAttributeDelay;
 import com.viaversion.viafabricplus.bedrock.building.BedrockKnockback;
+import com.viaversion.viafabricplus.bedrock.building.BedrockPacketDelay;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
@@ -50,8 +50,9 @@ public abstract class MixinClientPacketListener {
     }
 
     @Inject(method = "handleUpdateAttributes", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/protocol/PacketUtils;ensureRunningOnSameThread(Lnet/minecraft/network/protocol/Packet;Lnet/minecraft/network/PacketListener;Lnet/minecraft/network/PacketProcessor;)V", shift = At.Shift.AFTER), cancellable = true)
-    private void applyAttributesNextTick(final ClientboundUpdateAttributesPacket packet, final CallbackInfo ci) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) && BedrockAttributeDelay.hold(packet)) {
+    private void applyAttributesLater(final ClientboundUpdateAttributesPacket packet, final CallbackInfo ci) {
+        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)
+            && BedrockPacketDelay.hold(packet, packet.getEntityId(), BedrockPacketDelay.ATTRIBUTE_TICKS, ClientPacketListener::handleUpdateAttributes)) {
             ci.cancel();
         }
     }

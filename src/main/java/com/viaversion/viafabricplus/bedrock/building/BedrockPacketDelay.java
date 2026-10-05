@@ -25,35 +25,35 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.function.BiConsumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.network.protocol.game.ClientboundUpdateAttributesPacket;
+import net.minecraft.network.protocol.Packet;
 
 /**
- * The Bedrock client moves with attributes the server changed only from the second tick after it received them on, as
- * recorded on Dragonfly: the movement speed it sends right after a sprint stop still applies to the next two moves. Java
- * applies them before the next move, so the local player's attribute updates are held back for two client ticks. Only
- * used on the render thread.
+ * The Bedrock client acts on some server updates of its own player later than Java, as recorded on Dragonfly: the
+ * movement speed it sends right after a sprint stop still applies to the next two moves. Those packets are held back
+ * for that many client ticks. Only used on the render thread.
  */
-public final class BedrockAttributeDelay {
+public final class BedrockPacketDelay {
 
-    private static final int DELAY_TICKS = 2;
+    public static final int ATTRIBUTE_TICKS = 2;
 
-    private static final Deque<Pending> PENDING = new ArrayDeque<>();
+    private static final Deque<Pending<?>> PENDING = new ArrayDeque<>();
     private static boolean applying;
 
-    private BedrockAttributeDelay() {
+    private BedrockPacketDelay() {
     }
 
     /**
      * @return whether the packet was held back
      */
-    public static boolean hold(final ClientboundUpdateAttributesPacket packet) {
+    public static <T extends Packet<?>> boolean hold(final T packet, final int entityId, final int ticks, final BiConsumer<ClientPacketListener, T> handler) {
         final Minecraft minecraft = Minecraft.getInstance();
-        if (applying || minecraft.player == null || packet.getEntityId() != minecraft.player.getId()) {
+        if (applying || minecraft.player == null || entityId != minecraft.player.getId()) {
             return false;
         }
-        PENDING.add(new Pending(packet, new int[]{DELAY_TICKS}));
+        PENDING.add(new Pending<>(packet, handler, new int[]{ticks}));
         return true;
     }
 
@@ -69,24 +69,30 @@ public final class BedrockAttributeDelay {
             PENDING.clear();
             return;
         }
-        final List<ClientboundUpdateAttributesPacket> due = new ArrayList<>();
-        for (final Pending pending : PENDING) {
+        // Packets are applied in the order they arrived, so one is only due when all before it are
+        final List<Pending<?>> due = new ArrayList<>();
+        for (final Pending<?> pending : PENDING) {
             pending.ticksLeft[0]--;
         }
         while (!PENDING.isEmpty() && PENDING.peek().ticksLeft[0] <= 0) {
-            due.add(PENDING.poll().packet);
+            due.add(PENDING.poll());
         }
         applying = true;
         try {
-            for (final ClientboundUpdateAttributesPacket packet : due) {
-                connection.handleUpdateAttributes(packet);
+            for (final Pending<?> pending : due) {
+                pending.apply(connection);
             }
         } finally {
             applying = false;
         }
     }
 
-    private record Pending(ClientboundUpdateAttributesPacket packet, int[] ticksLeft) {
+    private record Pending<T extends Packet<?>>(T packet, BiConsumer<ClientPacketListener, T> handler, int[] ticksLeft) {
+
+        void apply(final ClientPacketListener connection) {
+            this.handler.accept(connection, this.packet);
+        }
+
     }
 
 }

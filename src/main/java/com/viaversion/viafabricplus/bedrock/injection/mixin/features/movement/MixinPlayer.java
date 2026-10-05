@@ -24,6 +24,7 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.building.BedrockSprint;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Avatar;
 import net.minecraft.world.entity.Entity;
@@ -35,7 +36,6 @@ import net.minecraft.world.phys.Vec3;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -43,9 +43,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(Player.class)
 public abstract class MixinPlayer extends Avatar {
-
-    @Unique
-    private int viaFabricPlusBedrock$ticksSinceSwimming;
 
     protected MixinPlayer(final EntityType<? extends LivingEntity> type, final Level level) {
         super(type, level);
@@ -71,12 +68,9 @@ public abstract class MixinPlayer extends Avatar {
             return;
         }
 
-        if (this.isSwimming()) {
-            this.viaFabricPlusBedrock$ticksSinceSwimming++;
-        } else {
-            this.viaFabricPlusBedrock$ticksSinceSwimming = 0;
-        }
-        if (this.viaFabricPlusBedrock$ticksSinceSwimming > 0 && this.viaFabricPlusBedrock$ticksSinceSwimming < 10 && this.isJumping()) {
+        // The first 10 ticks after the swimming started, also again after the server reset it
+        final int ticksSinceSwimStart = BedrockSprint.tickSwimming(this.isSwimming());
+        if (ticksSinceSwimStart > 0 && ticksSinceSwimStart <= 10 && this.isJumping()) {
             this.setDeltaMovement(this.getDeltaMovement().x(), 0, this.getDeltaMovement().z());
         }
     }
