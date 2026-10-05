@@ -36,6 +36,10 @@ import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
+import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import org.spongepowered.asm.mixin.Unique;
+import net.minecraft.world.entity.MoverType;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -96,6 +100,34 @@ public abstract class MixinEntity {
         if (BedrockInputReplay.isPlaying() && (Object) this == Minecraft.getInstance().player) {
             ci.cancel();
         }
+    }
+
+    @Unique
+    private Vec3 viaFabricPlusBedrock$replayCollided;
+
+    @Inject(method = "collide", at = @At("RETURN"))
+    private void rememberReplayCollision(final Vec3 movement, final CallbackInfoReturnable<Vec3> cir) {
+        if (BedrockInputReplay.isPlaying() && (Object) this == Minecraft.getInstance().player) {
+            this.viaFabricPlusBedrock$replayCollided = cir.getReturnValue();
+        }
+    }
+
+    /**
+     * Logs every movement of the player during an input replay, for comparing with the Bedrock client.
+     */
+    @Inject(method = "move", at = @At("TAIL"))
+    private void logReplayMovement(final MoverType type, final Vec3 movement, final CallbackInfo ci) {
+        final Entity entity = (Entity) (Object) this;
+        if (!BedrockInputReplay.isPlaying() || entity != Minecraft.getInstance().player || type != MoverType.SELF) {
+            return;
+        }
+        final Vec3 collided = this.viaFabricPlusBedrock$replayCollided;
+        final Vec3 velocity = entity.getDeltaMovement();
+        ViaFabricPlusBedrock.impl().logger().info(String.format(java.util.Locale.ROOT,
+            "[replay-move] frame=%d intended=(%.5f,%.5f,%.5f) collided=(%.5f,%.5f,%.5f) velocity=(%.5f,%.5f,%.5f) onGround=%s horizontal=%s minor=%s vertical=%s",
+            BedrockInputReplay.frameIndex() - 1, movement.x, movement.y, movement.z,
+            collided != null ? collided.x : Double.NaN, collided != null ? collided.y : Double.NaN, collided != null ? collided.z : Double.NaN,
+            velocity.x, velocity.y, velocity.z, entity.onGround(), entity.horizontalCollision, entity.minorHorizontalCollision, entity.verticalCollision));
     }
 
 }

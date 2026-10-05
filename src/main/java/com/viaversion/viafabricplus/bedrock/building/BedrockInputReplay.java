@@ -67,6 +67,10 @@ public final class BedrockInputReplay {
         return state == State.PLAYING;
     }
 
+    public static int frameIndex() {
+        return frameIndex;
+    }
+
     /**
      * Called at the end of every client tick.
      */
