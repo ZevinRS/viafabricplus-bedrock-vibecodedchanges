@@ -25,6 +25,7 @@ import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.building.BedrockInputReplay;
+import com.viaversion.viafabricplus.bedrock.building.BedrockSprint;
 import net.minecraft.client.Minecraft;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import net.minecraft.world.entity.Entity;
@@ -106,10 +107,25 @@ public abstract class MixinEntity {
     private Vec3 viaFabricPlusBedrock$replayCollided;
 
     @Inject(method = "collide", at = @At("RETURN"))
-    private void rememberReplayCollision(final Vec3 movement, final CallbackInfoReturnable<Vec3> cir) {
-        if (BedrockInputReplay.isPlaying() && (Object) this == Minecraft.getInstance().player) {
+    private void rememberCollision(final Vec3 movement, final CallbackInfoReturnable<Vec3> cir) {
+        if ((Object) this == Minecraft.getInstance().player) {
             this.viaFabricPlusBedrock$replayCollided = cir.getReturnValue();
         }
+    }
+
+    /**
+     * Bedrock stops sprinting after a move only when the axis the player mostly tried to move along was blocked, see
+     * {@link com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement.MixinLocalPlayer}.
+     */
+    @Inject(method = "move", at = @At("TAIL"))
+    private void rememberBlockedMainAxis(final MoverType type, final Vec3 movement, final CallbackInfo ci) {
+        if (type != MoverType.SELF || (Object) this != Minecraft.getInstance().player || this.viaFabricPlusBedrock$replayCollided == null) {
+            return;
+        }
+        final Vec3 collided = this.viaFabricPlusBedrock$replayCollided;
+        final double epsilon = 5.0E-5;
+        BedrockSprint.setMainAxisBlocked(Math.abs(movement.x) < Math.abs(movement.z) && Math.abs(collided.z) < epsilon
+            || Math.abs(movement.z) < Math.abs(movement.x) && Math.abs(collided.x) < epsilon);
     }
 
     /**

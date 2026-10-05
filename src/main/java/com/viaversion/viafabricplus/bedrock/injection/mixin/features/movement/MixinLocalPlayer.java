@@ -21,7 +21,9 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.building.BedrockSprint;
 import com.viaversion.viafabricplus.bedrock.building.BedrockItemUse;
 import net.minecraft.client.player.LocalPlayer;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
@@ -42,6 +44,21 @@ public abstract class MixinLocalPlayer {
     @Redirect(method = {"shouldStopRunSprinting", "canStartSprinting"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;isSprintingPossible(Z)Z"))
     private boolean allowNonSwimWaterSprinting(final LocalPlayer instance, final boolean allowedInShallowWater) {
         return this.isSprintingPossible(allowedInShallowWater || ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) && (instance.isSwimming() || instance.onGround()));
+    }
+
+    /**
+     * Java stops sprinting when the player collides horizontally, unless the collision was minor. Bedrock only does when
+     * the move was blocked along the axis the player mostly tried to move along, so sliding along a wall keeps
+     * sprinting (SprintTriggerSystem::doIntentTick).
+     */
+    @ModifyExpressionValue(method = "shouldStopRunSprinting", at = @At(value = "FIELD", target = "Lnet/minecraft/client/player/LocalPlayer;horizontalCollision:Z"))
+    private boolean bedrockSprintCollision(final boolean horizontalCollision) {
+        return ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) ? BedrockSprint.isMainAxisBlocked() : horizontalCollision;
+    }
+
+    @ModifyExpressionValue(method = "shouldStopRunSprinting", at = @At(value = "FIELD", target = "Lnet/minecraft/client/player/LocalPlayer;minorHorizontalCollision:Z"))
+    private boolean noMinorCollisionOnBedrock(final boolean minorHorizontalCollision) {
+        return !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) && minorHorizontalCollision;
     }
 
     @Inject(method = "modifyInput", at = @At("HEAD"))
