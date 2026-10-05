@@ -63,6 +63,8 @@
     "features.movement.MixinPlayer",
     "viabedrock.MixinBedrockProtocol",
     "viabedrock.MixinGlyphSheetResourceRewriter",
+    "viabedrock.MixinInventoryContainer",
+    "viabedrock.MixinOffhandContainer",
     "viabedrock.MixinResourcePackLoadStateTracker",
     "viabedrock.MixinRespawnGameModeEncoding"
   ],

@@ -23,13 +23,22 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.features.block;
 
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.building.BedrockBuilding;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.phys.BlockHitResult;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(MultiPlayerGameMode.class)
 public abstract class MixinMultiPlayerGameMode {
@@ -43,6 +52,25 @@ public abstract class MixinMultiPlayerGameMode {
         return !(packet instanceof final ServerboundPlayerActionPacket actionPacket
             && actionPacket.getAction() == ServerboundPlayerActionPacket.Action.CHANGE_DESTROY_DIRECTION
             && BedrockProtocolVersion.BEDROCK_LATEST.equals(ViaFabricPlus.api().targetVersion()));
+    }
+
+    @Unique
+    private boolean viaFabricPlusBedrock$placingBlock;
+
+    @Inject(method = "performUseItemOn", at = @At("HEAD"))
+    private void checkPlacingBlock(final LocalPlayer player, final InteractionHand hand, final BlockHitResult hit, final CallbackInfoReturnable<InteractionResult> cir) {
+        this.viaFabricPlusBedrock$placingBlock = hand == InteractionHand.MAIN_HAND && player.getMainHandItem().getItem() instanceof BlockItem && BedrockBuilding.isActive();
+    }
+
+    /**
+     * The Bedrock client sends placements depending on whether they succeeded, which the packet doesn't tell.
+     */
+    @Inject(method = "performUseItemOn", at = @At("RETURN"))
+    private void recordPlacement(final LocalPlayer player, final InteractionHand hand, final BlockHitResult hit, final CallbackInfoReturnable<InteractionResult> cir) {
+        if (this.viaFabricPlusBedrock$placingBlock) {
+            this.viaFabricPlusBedrock$placingBlock = false;
+            BedrockBuilding.recordPlacement(hit, cir.getReturnValue());
+        }
     }
 
 }

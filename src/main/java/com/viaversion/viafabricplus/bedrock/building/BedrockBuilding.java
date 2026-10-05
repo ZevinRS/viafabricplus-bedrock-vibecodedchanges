@@ -74,9 +74,9 @@ public final class BedrockBuilding {
 
     private static final BedrockBuilding INSTANCE = new BedrockBuilding();
 
-    // Placements made by holding use, so they are sent like Bedrock's simulation_tick placements
-    private static final Queue<SimulatedPlacement> SIMULATED_PLACEMENTS = new ConcurrentLinkedQueue<>();
-    private static final long SIMULATED_PLACEMENT_TIMEOUT_NANOS = 1_000_000_000L;
+    // Block placements made by the client, so they can be sent like the Bedrock client sends them
+    private static final Queue<Placement> PLACEMENTS = new ConcurrentLinkedQueue<>();
+    private static final long PLACEMENT_TIMEOUT_NANOS = 1_000_000_000L;
 
     // Whether the click that starts holding use was handled. Java sets the use key down as soon as it's pressed, but only
     // handles the click on the next tick, so building would otherwise start before the click and place an extra block.
@@ -89,6 +89,8 @@ public final class BedrockBuilding {
     private Direction continueFacing = Direction.NORTH;
     private long lastBuildTime;
     private String branch = "";
+    // Click position of the placement made by holding use, which Bedrock sends as simulation_tick placement
+    private @Nullable Position3f simulatedClickPosition;
 
     private BedrockBuilding() {
     }
@@ -234,8 +236,13 @@ public final class BedrockBuilding {
 
         final Position3f clickPosition = hitLocation == null ? Position3f.ZERO : new Position3f(
             (float) (hitLocation.x - pos.getX()), (float) (hitLocation.y - pos.getY()), (float) (hitLocation.z - pos.getZ()));
-        SIMULATED_PLACEMENTS.add(new SimulatedPlacement(pos.getX(), pos.getY(), pos.getZ(), face.get3DDataValue(), clickPosition, now));
-        final boolean built = this.place(minecraft, player, hit);
+        this.simulatedClickPosition = clickPosition;
+        final boolean built;
+        try {
+            built = this.place(minecraft, player, hit);
+        } finally {
+            this.simulatedClickPosition = null;
+        }
         if (DEBUG) {
             final Vec3 delta = posDelta(player);
             ViaFabricPlusBedrock.impl().logger().info("[build] {} {} {} -> {} built={} delay={} delta=({}, {}, {}) dir={} pitch={}",
@@ -291,14 +298,30 @@ public final class BedrockBuilding {
     }
 
     /**
-     * @return the placement made by holding use for this block and face, or null if it was a click
+     * Called after the client placed (or failed to place) a block with the main hand, before the packet is sent.
      */
-    public static @Nullable SimulatedPlacement pollSimulatedPlacement(final int x, final int y, final int z, final int face) {
+    public static void recordPlacement(final BlockHitResult hit, final InteractionResult result) {
+        final Placement.Result placementResult;
+        if (result instanceof InteractionResult.Success) {
+            placementResult = Placement.Result.SUCCESS;
+        } else if (result instanceof InteractionResult.Fail) {
+            placementResult = Placement.Result.FAIL;
+        } else {
+            placementResult = Placement.Result.PASS; // The client goes on to use the item
+        }
+        final BlockPos pos = hit.getBlockPos();
+        PLACEMENTS.add(new Placement(pos.getX(), pos.getY(), pos.getZ(), hit.getDirection().get3DDataValue(), INSTANCE.simulatedClickPosition, placementResult, System.nanoTime()));
+    }
+
+    /**
+     * @return the recorded placement for this block and face, or null if the client didn't place a block
+     */
+    public static @Nullable Placement pollPlacement(final int x, final int y, final int z, final int face) {
         final long now = System.nanoTime();
-        final Iterator<SimulatedPlacement> iterator = SIMULATED_PLACEMENTS.iterator();
+        final Iterator<Placement> iterator = PLACEMENTS.iterator();
         while (iterator.hasNext()) {
-            final SimulatedPlacement placement = iterator.next();
-            if (now - placement.time() > SIMULATED_PLACEMENT_TIMEOUT_NANOS) {
+            final Placement placement = iterator.next();
+            if (now - placement.time() > PLACEMENT_TIMEOUT_NANOS) {
                 iterator.remove();
             } else if (placement.x() == x && placement.y() == y && placement.z() == z && placement.face() == face) {
                 iterator.remove();
@@ -308,7 +331,19 @@ public final class BedrockBuilding {
         return null;
     }
 
-    public record SimulatedPlacement(int x, int y, int z, int face, Position3f clickPosition, long time) {
+    /**
+     * @param simulatedClickPosition the click position if the block was placed by holding use, null for a click
+     */
+    public record Placement(int x, int y, int z, int face, @Nullable Position3f simulatedClickPosition, Result result, long time) {
+
+        public boolean simulated() {
+            return this.simulatedClickPosition != null;
+        }
+
+        public enum Result {
+            SUCCESS, FAIL, PASS
+        }
+
     }
 
     /**

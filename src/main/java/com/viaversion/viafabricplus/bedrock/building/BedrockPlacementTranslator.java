@@ -72,12 +72,14 @@ import net.raphimc.viabedrock.protocol.types.BedrockTypes;
  * Sends block placements like the Bedrock client instead of ViaBedrock's simplified translation, as recorded from the
  * Bedrock client:
  * <ul>
- *     <li>start_item_use_on once when a click starts placing, stop_item_use_on with the last placed block on release</li>
+ *     <li>start_item_use_on once when a click places a block, stop_item_use_on with the last placed block on release</li>
  *     <li>a "build" swing before each placement, instead of an "attack" swing marked as a missed swing after it</li>
- *     <li>placements with a legacy request id and the changed hotbar slot, followed by a click_air use after clicks</li>
+ *     <li>placements with a legacy request id and the changed hotbar slot, followed by a use on air after clicks</li>
+ *     <li>failed placements without request id, item change or swing</li>
  *     <li>simulation_tick as trigger for placements of held use (see {@link BedrockBuilding})</li>
- *     <li>the selected item with its new count after each placement</li>
+ *     <li>the held item with its predicted count after each placement</li>
  * </ul>
+ * Every item use transaction takes a legacy request id, even the ones sent without it.
  */
 public final class BedrockPlacementTranslator {
 
@@ -86,10 +88,11 @@ public final class BedrockPlacementTranslator {
 
     public static void register(final BedrockProtocol protocol) {
         protocol.replaceServerbound(ServerboundPackets26_3.USE_ITEM_ON, BedrockPlacementTranslator::useItemOn);
+        protocol.replaceServerbound(ServerboundPackets26_3.USE_ITEM, BedrockPlacementTranslator::useItem);
         protocol.replaceServerbound(ServerboundPackets26_3.PUNCH, BedrockPlacementTranslator::punch);
     }
 
-    private static BedrockPlacementState state(final UserConnection user) {
+    public static BedrockPlacementState state(final UserConnection user) {
         BedrockPlacementState state = user.get(BedrockPlacementState.class);
         if (state == null) {
             state = new BedrockPlacementState();
@@ -120,8 +123,34 @@ public final class BedrockPlacementTranslator {
 
         final BlockFace face = direction.blockFace();
         final BlockPosition placePosition = insideBlock ? position : position.getRelative(face);
-        final BedrockBuilding.SimulatedPlacement simulated = BedrockBuilding.pollSimulatedPlacement(position.x(), position.y(), position.z(), faceId);
-        if (simulated == null) { // A click starts using the item on the block
+        final BedrockBuilding.Placement placement = BedrockBuilding.pollPlacement(position.x(), position.y(), position.z(), faceId);
+        if (placement == null) { // Not a block placement, for example opening a door
+            useItemOnLikeViaBedrock(user, clientPlayer, inventory, chunkTracker, position, placePosition, faceId, javaClickPosition);
+            return;
+        }
+
+        final boolean simulated = placement.simulated();
+        final byte slot = inventory.getSelectedHotbarSlot();
+        final BedrockItem heldItem = state.heldItem(slot, inventory.getSelectedHotbarItem());
+        final int legacyRequestId = state.nextLegacyRequestId();
+        final ItemUseTriggerType trigger = simulated ? ItemUseTriggerType.Simulation_Tick : ItemUseTriggerType.Player_Input;
+        final Position3f clickPosition = simulated ? placement.simulatedClickPosition() : javaClickPosition;
+        final int blockRuntimeId = chunkTracker.getBlockState(position);
+
+        if (placement.result() != BedrockBuilding.Placement.Result.SUCCESS) {
+            sendTransaction(user, new BedrockInventoryTransaction(0, null, null, ComplexInventoryTransaction_Type.ItemUseTransaction,
+                new InventoryTransactionData.UseItemTransactionData(ItemUseActionType.Place, trigger, position, faceId, slot, HandSlot.Mainhand,
+                    heldItem, clientPlayer.position(), clickPosition, blockRuntimeId, ItemUsePredictedResult.Failure, ItemUseClientCooldownState.Off)
+            ));
+            // When the placement passed, the client goes on to use the item, which sends the use on air
+            if (!simulated && placement.result() == BedrockBuilding.Placement.Result.FAIL) {
+                sendUseOnAir(user, clientPlayer, slot, heldItem);
+                state.nextLegacyRequestId();
+            }
+            return;
+        }
+
+        if (!simulated) { // A click starts using the item on blocks
             PlayerActionPacketFactory.sendBedrockPlayerAction(user, clientPlayer.runtimeId(), PlayerActionType.StartItemUseOn, position, placePosition, faceId);
             state.setUsingItemOn(true);
         }
@@ -129,8 +158,6 @@ public final class BedrockPlacementTranslator {
         sendSwing(user, clientPlayer, ActorSwingSource.Build);
         state.expectPlacementSwing();
 
-        final byte slot = inventory.getSelectedHotbarSlot();
-        final BedrockItem heldItem = inventory.getSelectedHotbarItem();
         BedrockItem predictedItem = heldItem.copy();
         if (predictedItem.blockRuntimeId() != 0 && clientPlayer.javaGameMode() != GameMode.CREATIVE) {
             predictedItem.setAmount(predictedItem.amount() - 1);
@@ -140,51 +167,20 @@ public final class BedrockPlacementTranslator {
         }
 
         sendTransaction(user, new BedrockInventoryTransaction(
-            state.nextLegacyRequestId(),
+            legacyRequestId,
             List.of(new LegacySetItemSlotData(ContainerEnumName.InventoryContainer, new byte[]{slot})),
             List.of(new InventoryActionData(new InventorySource(InventorySourceType.Container_Inventory, ContainerID.CONTAINER_ID_INVENTORY.getValue(), InventorySourceFlags.No_Flag), slot, heldItem, predictedItem)),
             ComplexInventoryTransaction_Type.ItemUseTransaction,
-            new InventoryTransactionData.UseItemTransactionData(
-                ItemUseActionType.Place,
-                simulated != null ? ItemUseTriggerType.Simulation_Tick : ItemUseTriggerType.Player_Input,
-                position,
-                faceId,
-                slot,
-                HandSlot.Mainhand,
-                heldItem,
-                clientPlayer.position(),
-                simulated != null ? simulated.clickPosition() : javaClickPosition,
-                chunkTracker.getBlockState(position),
-                ItemUsePredictedResult.Success,
-                ItemUseClientCooldownState.Off
-            )
+            new InventoryTransactionData.UseItemTransactionData(ItemUseActionType.Place, trigger, position, faceId, slot, HandSlot.Mainhand,
+                heldItem, clientPlayer.position(), clickPosition, blockRuntimeId, ItemUsePredictedResult.Success, ItemUseClientCooldownState.Off)
         ));
 
-        if (simulated == null) { // A click is followed by using the item on air, which also takes a legacy request id
+        if (!simulated) { // A click is followed by using the item on air
+            sendUseOnAir(user, clientPlayer, slot, predictedItem);
             state.nextLegacyRequestId();
-            sendTransaction(user, new BedrockInventoryTransaction(
-                0,
-                null,
-                null,
-                ComplexInventoryTransaction_Type.ItemUseTransaction,
-                new InventoryTransactionData.UseItemTransactionData(
-                    ItemUseActionType.Use,
-                    ItemUseTriggerType.Unknown,
-                    new BlockPosition(0, 0, 0),
-                    255,
-                    slot,
-                    HandSlot.Mainhand,
-                    predictedItem,
-                    clientPlayer.position(),
-                    Position3f.ZERO,
-                    0,
-                    ItemUsePredictedResult.Failure,
-                    ItemUseClientCooldownState.Off
-                )
-            ));
         }
 
-        if (predictedItem.amount() != heldItem.amount()) {
+        if (state.equip(slot, predictedItem)) {
             final PacketWrapper mobEquipment = PacketWrapper.create(ServerboundBedrockPackets.MOB_EQUIPMENT, user);
             mobEquipment.write(BedrockTypes.UNSIGNED_VAR_LONG, clientPlayer.runtimeId()); // entity runtime id
             mobEquipment.write(user.get(ItemRewriter.class).newItemType(), predictedItem); // item
@@ -194,6 +190,55 @@ public final class BedrockPlacementTranslator {
             mobEquipment.sendToServer(BedrockProtocol.class);
         }
         state.setLastPlacedPosition(placePosition);
+    }
+
+    /**
+     * ViaBedrock's translation, for using items on blocks without placing a block.
+     */
+    private static void useItemOnLikeViaBedrock(final UserConnection user, final ClientPlayerEntity clientPlayer, final InventoryContainer inventory, final ChunkTracker chunkTracker,
+                                                final BlockPosition position, final BlockPosition placePosition, final int faceId, final Position3f clickPosition) {
+        PlayerActionPacketFactory.sendBedrockPlayerAction(user, clientPlayer.runtimeId(), PlayerActionType.StartItemUseOn, position, placePosition, faceId);
+
+        BedrockItem predictedItem = inventory.getSelectedHotbarItem().copy();
+        if (predictedItem.blockRuntimeId() != 0 && clientPlayer.javaGameMode() != GameMode.CREATIVE) {
+            predictedItem.setAmount(predictedItem.amount() - 1);
+        }
+        if (predictedItem.amount() <= 0) {
+            predictedItem = BedrockItem.empty();
+        }
+        sendTransaction(user, new BedrockInventoryTransaction(
+            0,
+            null,
+            List.of(new InventoryActionData(new InventorySource(InventorySourceType.Container_Inventory, ContainerID.CONTAINER_ID_INVENTORY.getValue(), InventorySourceFlags.No_Flag),
+                inventory.getSelectedHotbarSlot(), inventory.getSelectedHotbarItem(), predictedItem)),
+            ComplexInventoryTransaction_Type.ItemUseTransaction,
+            new InventoryTransactionData.UseItemTransactionData(ItemUseActionType.Place, ItemUseTriggerType.Player_Input, position, faceId, inventory.getSelectedHotbarSlot(),
+                HandSlot.Mainhand, inventory.getSelectedHotbarItem(), clientPlayer.position(), clickPosition, chunkTracker.getBlockState(position),
+                ItemUsePredictedResult.Success, ItemUseClientCooldownState.Off)
+        ));
+
+        PlayerActionPacketFactory.sendBedrockPlayerAction(user, clientPlayer.runtimeId(), PlayerActionType.StopItemUseOn, position, new BlockPosition(0, 0, 0), 0);
+    }
+
+    /**
+     * ViaBedrock's translation of using an item, which also takes a legacy request id like on Bedrock.
+     */
+    private static void useItem(final PacketWrapper wrapper) {
+        wrapper.cancel();
+        final int hand = wrapper.read(Types.VAR_INT); // hand
+        wrapper.read(Types.VAR_INT); // sequence
+        wrapper.read(Types.FLOAT); // yaw
+        wrapper.read(Types.FLOAT); // pitch
+        if (hand != InteractionHand.MAIN_HAND.ordinal()) { // Bedrock can't use items in the offhand
+            return;
+        }
+
+        final UserConnection user = wrapper.user();
+        final InventoryContainer inventory = user.get(InventoryTracker.class).getInventoryContainer();
+        final BedrockPlacementState state = state(user);
+        final byte slot = inventory.getSelectedHotbarSlot();
+        sendUseOnAir(user, user.get(EntityTracker.class).getClientPlayer(), slot, state.heldItem(slot, inventory.getSelectedHotbarItem()));
+        state.nextLegacyRequestId();
     }
 
     /**
@@ -249,6 +294,13 @@ public final class BedrockPlacementTranslator {
         animate.write(BedrockTypes.FLOAT_LE, 0F); // data
         animate.write(BedrockTypes.OPTIONAL_STRING, source.name().toLowerCase(Locale.ROOT)); // swing source
         animate.sendToServer(BedrockProtocol.class);
+    }
+
+    private static void sendUseOnAir(final UserConnection user, final ClientPlayerEntity clientPlayer, final byte slot, final BedrockItem item) {
+        sendTransaction(user, new BedrockInventoryTransaction(0, null, null, ComplexInventoryTransaction_Type.ItemUseTransaction,
+            new InventoryTransactionData.UseItemTransactionData(ItemUseActionType.Use, ItemUseTriggerType.Unknown, new BlockPosition(0, 0, 0), 255, slot, HandSlot.Mainhand,
+                item, clientPlayer.position(), Position3f.ZERO, 0, ItemUsePredictedResult.Failure, ItemUseClientCooldownState.Off)
+        ));
     }
 
     private static void sendTransaction(final UserConnection user, final BedrockInventoryTransaction transaction) {

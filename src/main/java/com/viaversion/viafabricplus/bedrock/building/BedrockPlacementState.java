@@ -23,6 +23,7 @@ package com.viaversion.viafabricplus.bedrock.building;
 
 import com.viaversion.viaversion.api.connection.StorableObject;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
+import net.raphimc.viabedrock.protocol.model.BedrockItem;
 
 /**
  * Per connection state for translating block placements the way the Bedrock client sends them. Only used on the netty
@@ -36,6 +37,11 @@ public final class BedrockPlacementState implements StorableObject {
     private boolean usingItemOn;
     private BlockPosition lastPlacedPosition = new BlockPosition(0, 0, 0);
     private long placementSwingUntil;
+
+    // The Bedrock client only sends mob_equipment when its held items change
+    private int equippedSlot = -1;
+    private BedrockItem equippedItem;
+    private BedrockItem equippedOffhandItem;
 
     public int nextLegacyRequestId() {
         final int id = this.nextLegacyRequestId;
@@ -70,6 +76,40 @@ public final class BedrockPlacementState implements StorableObject {
         final boolean expected = System.nanoTime() < this.placementSwingUntil;
         this.placementSwingUntil = 0;
         return expected;
+    }
+
+    /**
+     * @return whether the held item differs from the last one sent, and remembers it as sent if so
+     */
+    public boolean equip(final int slot, final BedrockItem item) {
+        if (slot == this.equippedSlot && same(item, this.equippedItem)) {
+            return false;
+        }
+        this.equippedSlot = slot;
+        this.equippedItem = item.copy();
+        return true;
+    }
+
+    /**
+     * @return the held item as the client predicts it, which is only updated by the server once it handled placements
+     */
+    public BedrockItem heldItem(final int slot, final BedrockItem serverItem) {
+        if (slot == this.equippedSlot && this.equippedItem != null && !this.equippedItem.isDifferent(serverItem)) {
+            return this.equippedItem.copy();
+        }
+        return serverItem;
+    }
+
+    public boolean equipOffhand(final BedrockItem item) {
+        if (same(item, this.equippedOffhandItem)) {
+            return false;
+        }
+        this.equippedOffhandItem = item.copy();
+        return true;
+    }
+
+    private static boolean same(final BedrockItem item, final BedrockItem other) {
+        return other != null && !item.isDifferent(other) && item.amount() == other.amount();
     }
 
 }
