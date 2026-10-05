@@ -21,7 +21,13 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.bedrock.building.BedrockPlacementState;
+import com.viaversion.viaversion.api.minecraft.chunks.DataPalette;
+import com.viaversion.viaversion.api.minecraft.chunks.PaletteType;
+import java.util.List;
+import net.raphimc.viabedrock.api.chunk.section.BedrockChunkSection;
 import com.viaversion.viaversion.api.connection.StoredObject;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
@@ -47,6 +53,21 @@ public abstract class MixinChunkTracker extends StoredObject {
         if (layer == 0 && state != null) {
             state.onServerBlockChange(blockPosition);
         }
+    }
+
+    /**
+     * A sub chunk can arrive again after it was loaded, for example when the server sends it again for a request the
+     * client repeated. ViaBedrock only expects the first one and disconnects. The Bedrock client uses the newest one.
+     */
+    @WrapOperation(method = "mergeSubChunk", at = @At(value = "INVOKE", target = "Lnet/raphimc/viabedrock/api/chunk/section/BedrockChunkSection;mergeWith(Lnet/raphimc/viabedrock/api/chunk/section/BedrockChunkSection;)V"))
+    private void replaceLoadedSubChunk(final BedrockChunkSection section, final BedrockChunkSection other, final Operation<Void> original) {
+        if (section.hasPendingBlockUpdates()) {
+            original.call(section, other);
+            return;
+        }
+        final List<DataPalette> blockPalettes = section.palettes(PaletteType.BLOCKS);
+        blockPalettes.clear();
+        blockPalettes.addAll(other.palettes(PaletteType.BLOCKS));
     }
 
 }
