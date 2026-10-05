@@ -34,11 +34,13 @@ import net.raphimc.viabedrock.protocol.data.ProtocolConstants;
 public final class BedrockSettings {
 
     private final BooleanSetting replaceDefaultPort;
+    private final BooleanSetting recordPackets;
 
     public BedrockSettings() {
         final SettingGroup group = ViaFabricPlus.api().settings().register("bedrock");
         group.register("account", new ActionSetting(Component.translatable("bedrock_settings.viafabricplus.account"), BedrockSettings::accountName, () -> ViaFabricPlusBedrock.impl().account().login()));
         this.replaceDefaultPort = group.registerBoolean("replace_default_port", true);
+        this.recordPackets = group.registerBoolean("record_packets", false);
     }
 
     private static Component accountName() {
@@ -60,6 +62,10 @@ public final class BedrockSettings {
 
     public BooleanSetting replaceDefaultPort() {
         return this.replaceDefaultPort;
+    }
+
+    public BooleanSetting recordPackets() {
+        return this.recordPackets;
     }
 
 }

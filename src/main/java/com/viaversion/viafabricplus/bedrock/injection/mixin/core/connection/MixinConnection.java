@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.core.connection;
 
+import com.viaversion.viafabricplus.bedrock.protocoltranslator.netty.BedrockPacketRecorder;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -190,6 +191,9 @@ public abstract class MixinConnection extends SimpleChannelInboundHandler<Packet
                         );
                         f.channel().pipeline().remove(PacketCodec.NAME);
                         f.channel().pipeline().remove(HandlerNames.SPLITTER);
+                        if (f.channel().pipeline().get(BedrockPacketRecorder.NAME) != null) {
+                            f.channel().pipeline().remove(BedrockPacketRecorder.NAME);
+                        }
 
                         final UserConnection user = ((IConnection) clientConnection).viaFabricPlus$getUserConnection();
                         user.getProtocolInfo().getPipeline().add(BedrockRakNetStatusProtocol.INSTANCE);

@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.core.connection;
 
+import com.viaversion.viafabricplus.bedrock.protocoltranslator.netty.BedrockPacketRecorder;
 import com.viaversion.viafabricplus.injection.access.core.IConnection;
 import com.viaversion.viaversion.platform.ViaDecodeHandler;
 import org.cloudburstmc.netty.channel.nethernet.config.NetherChannelOption;
@@ -80,6 +81,9 @@ public abstract class MixinConnection_1 {
         pipeline.replace(HandlerNames.SPLITTER, HandlerNames.SPLITTER, new BatchLengthCodec());
         pipeline.remove(HandlerNames.PREPENDER);
         pipeline.addBefore(ViaDecodeHandler.NAME, PacketCodec.NAME, new PacketCodec());
+        if (BedrockPacketRecorder.isEnabled()) {
+            pipeline.addAfter(HandlerNames.SPLITTER, BedrockPacketRecorder.NAME, new BedrockPacketRecorder());
+        }
     }
 
 }

@@ -7,6 +7,7 @@
   "bedrock_settings.viafabricplus.account": "Account for Bedrock Edition",
   "bedrock_settings.viafabricplus.account.login": "Click to log in",
   "bedrock_settings.viafabricplus.replace_default_port": "Replace default port in server list",
+  "bedrock_settings.viafabricplus.record_packets": "Record packets to bedrock-captures",
 
   "bedrock_account.viafabricplus.notice": "Your browser should have opened.\nClosing this screen will cancel the process!",
 
