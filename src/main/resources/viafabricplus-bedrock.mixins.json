@@ -66,6 +66,7 @@
     "viabedrock.MixinClientPlayerPackets",
     "viabedrock.MixinGlyphSheetResourceRewriter",
     "viabedrock.MixinInventoryContainer",
+    "viabedrock.MixinLivingEntity",
     "viabedrock.MixinOffhandContainer",
     "viabedrock.MixinResourcePackLoadStateTracker",
     "viabedrock.MixinRespawnGameModeEncoding"

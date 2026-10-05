@@ -35,8 +35,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class MixinPlayer {
 
     /**
-     * Java slows the attacker and stops sprinting when a fully charged attack knocks back. Bedrock has its own rule for
-     * the attacker, see {@link com.viaversion.viafabricplus.bedrock.injection.mixin.features.block.MixinMultiPlayerGameMode}.
+     * Java slows the attacker and stops sprinting when a fully charged attack knocks back, which the Bedrock client
+     * doesn't do (recorded on BDS and Dragonfly). Stopping to sprint for a tick would also add Java's sprint speed on top
+     * of the server's, see {@link com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock.MixinLivingEntity}.
      */
     @WrapWithCondition(method = "causeExtraKnockback", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Player;setDeltaMovement(Lnet/minecraft/world/phys/Vec3;)V"))
     private boolean skipJavaAttackSlowdown(final Player instance, final Vec3 deltaMovement) {

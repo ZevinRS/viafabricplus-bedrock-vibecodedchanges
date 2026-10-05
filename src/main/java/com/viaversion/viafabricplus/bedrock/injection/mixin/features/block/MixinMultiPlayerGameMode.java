@@ -22,8 +22,6 @@
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.block;
 
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.building.BedrockBuilding;
 import com.viaversion.viafabricplus.bedrock.building.BedrockItemUse;
@@ -34,8 +32,6 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.BucketItem;
@@ -59,20 +55,6 @@ public abstract class MixinMultiPlayerGameMode {
         return !(packet instanceof final ServerboundPlayerActionPacket actionPacket
             && actionPacket.getAction() == ServerboundPlayerActionPacket.Action.CHANGE_DESTROY_DIRECTION
             && BedrockProtocolVersion.BEDROCK_LATEST.equals(ViaFabricPlus.api().targetVersion()));
-    }
-
-    /**
-     * Bedrock slows the attacker's horizontal movement to 0.6 on every hit of a living entity while sprinting, as recorded
-     * from the Bedrock client: without an attack cooldown, even when the server rejects the hit, and without stopping to
-     * sprint, so holding sprint keeps sprinting.
-     */
-    @WrapOperation(method = "attack", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Player;attack(Lnet/minecraft/world/entity/Entity;)V"))
-    private void bedrockAttackSlowdown(final Player player, final Entity target, final Operation<Void> original) {
-        final boolean sprinting = player.isSprinting();
-        original.call(player, target);
-        if (sprinting && target instanceof LivingEntity && BedrockBuilding.isActive()) {
-            player.setDeltaMovement(player.getDeltaMovement().multiply(0.6, 1.0, 0.6));
-        }
     }
 
     @Unique
