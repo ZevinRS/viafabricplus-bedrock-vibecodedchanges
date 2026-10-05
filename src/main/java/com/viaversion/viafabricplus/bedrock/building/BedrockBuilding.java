@@ -97,6 +97,14 @@ public final class BedrockBuilding {
      * Bedrock's startBuildBlock: a new click on a block resets the build state.
      */
     public void startBuild() {
+        if (DEBUG) {
+            final StackTraceElement[] stack = new Throwable().getStackTrace();
+            final StringBuilder from = new StringBuilder();
+            for (int i = 1; i < Math.min(stack.length, 5); i++) {
+                from.append(stack[i].getMethodName()).append(':').append(stack[i].getLineNumber()).append(' ');
+            }
+            ViaFabricPlusBedrock.impl().logger().info("[build] start (use down={}) from {}", Minecraft.getInstance().options.keyUse.isDown(), from);
+        }
         this.hasBuildDirection = false;
         this.hasLastBuiltPosition = false;
     }
@@ -137,6 +145,10 @@ public final class BedrockBuilding {
             return;
         }
         if (!minecraft.options.keyUse.isDown() || minecraft.gui.screen() != null || player.isUsingItem() || player.isHandsBusy()) {
+            if (DEBUG && (this.hasLastBuiltPosition || this.hasBuildDirection)) {
+                ViaFabricPlusBedrock.impl().logger().info("[build] stop: use down={} screen={} using={} busy={}", minecraft.options.keyUse.isDown(),
+                    minecraft.gui.screen() != null, player.isUsingItem(), player.isHandsBusy());
+            }
             this.stopBuild();
             return;
         }
