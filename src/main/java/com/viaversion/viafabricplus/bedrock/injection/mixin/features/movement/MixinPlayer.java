@@ -35,6 +35,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -75,6 +76,24 @@ public abstract class MixinPlayer extends Avatar {
         }
     }
 
+    @Unique
+    private boolean viaFabricPlusBedrock$swimmingAtLastPose;
+
+    /**
+     * Bedrock changes the pose a tick after the swimming started or stopped, as recorded when surfacing: after the
+     * swimming stopped, the player is still in the water with the swimming pose for a tick.
+     */
+    @Redirect(method = "getDesiredPose", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Player;isSwimming()Z"))
+    private boolean swimmingPoseOneTickLater(final Player instance) {
+        final boolean swimming = instance.isSwimming();
+        if (!ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            return swimming;
+        }
+        final boolean swimmingBefore = this.viaFabricPlusBedrock$swimmingAtLastPose;
+        this.viaFabricPlusBedrock$swimmingAtLastPose = swimming;
+        return swimmingBefore;
+    }
+
     @Redirect(method = "travel", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Player;isSwimming()Z"))
     private boolean preventSwimmingResurface(final Player instance) {
         if (!ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) || !instance.isSwimming()) {
@@ -83,8 +102,13 @@ public abstract class MixinPlayer extends Avatar {
 
         final double lookY = this.getLookAngle().y;
         // TODO: The value used here (0.55) isn't entirely correct, however in most cases it should be fine.
-        if (this.level().getFluidState(BlockPos.containing(this.getX(), this.getY() + 0.4, this.getZ())).isEmpty() && lookY > 0 && lookY < 0.55) {
-            instance.setDeltaMovement(instance.getDeltaMovement().x(), 0, instance.getDeltaMovement().z());
+        if (this.level().getFluidState(BlockPos.containing(this.getX(), this.getY() + 0.4, this.getZ())).isEmpty() && lookY > 0) {
+            if (lookY < 0.55) {
+                instance.setDeltaMovement(instance.getDeltaMovement().x(), 0, instance.getDeltaMovement().z());
+            } else {
+                // Looking up further at the surface stops the swimming, as recorded between a look of 0.49 and 0.60 up
+                instance.setSwimming(false);
+            }
             return false;
         }
 
