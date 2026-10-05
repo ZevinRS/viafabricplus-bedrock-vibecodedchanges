@@ -21,10 +21,15 @@
 
 package com.viaversion.viafabricplus.bedrock.building;
 
+import net.minecraft.resources.Identifier;
+
 /**
  * State for Bedrock's sprint rules (SprintTriggerSystem::doIntentTick), only used on the render thread.
  */
 public final class BedrockSprint {
+
+    // The part of the server's movement speed its modifiers don't explain, which Bedrock forgets when its sprint modifier changes
+    public static final Identifier SERVER_VALUE_MODIFIER = Identifier.fromNamespaceAndPath("viafabricplus_bedrock", "server_value");
 
     // Whether the last move of the player didn't move it at all along the axis it mostly tried to move along
     private static boolean mainAxisBlocked;

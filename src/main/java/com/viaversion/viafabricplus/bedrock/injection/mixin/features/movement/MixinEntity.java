@@ -34,7 +34,9 @@ import com.viaversion.viaversion.api.connection.UserConnection;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
@@ -87,11 +89,14 @@ public abstract class MixinEntity {
         return ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) ? null : vehicle;
     }
 
-    // Bedrock inflates the box before deflating it, which is the same as inflating the deflated box
+    /**
+     * Bedrock inflates the box before deflating it, which is the same as inflating the deflated box. Horizontally it
+     * reaches 0.2 from the player's center instead of 0.3, as recorded from where the water current changes.
+     */
     @ModifyReturnValue(method = "getFluidInteractionBox", at = @At("RETURN"))
     private @Nullable AABB inflateFluidInteractionBox(final @Nullable AABB box) {
         if (box != null && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
-            return box.inflate(0, -0.4, 0);
+            return box.inflate(-0.099, -0.4, -0.099);
         } else {
             return box;
         }
@@ -144,10 +149,12 @@ public abstract class MixinEntity {
         final Vec3 collided = this.viaFabricPlusBedrock$replayCollided;
         final Vec3 velocity = entity.getDeltaMovement();
         ViaFabricPlusBedrock.impl().logger().info(String.format(java.util.Locale.ROOT,
-            "[replay-move] frame=%d intended=(%.5f,%.5f,%.5f) collided=(%.5f,%.5f,%.5f) velocity=(%.5f,%.5f,%.5f) onGround=%s horizontal=%s minor=%s vertical=%s",
+            "[replay-move] frame=%d intended=(%.5f,%.5f,%.5f) collided=(%.5f,%.5f,%.5f) velocity=(%.5f,%.5f,%.5f) onGround=%s horizontal=%s minor=%s vertical=%s speed=%.4f sprinting=%s t=%d",
             BedrockInputReplay.frameIndex() - 1, movement.x, movement.y, movement.z,
             collided != null ? collided.x : Double.NaN, collided != null ? collided.y : Double.NaN, collided != null ? collided.z : Double.NaN,
-            velocity.x, velocity.y, velocity.z, entity.onGround(), entity.horizontalCollision, entity.minorHorizontalCollision, entity.verticalCollision));
+            velocity.x, velocity.y, velocity.z, entity.onGround(), entity.horizontalCollision, entity.minorHorizontalCollision, entity.verticalCollision,
+            entity instanceof final LivingEntity living ? living.getAttributeValue(Attributes.MOVEMENT_SPEED) : Double.NaN,
+            entity.isSprinting(), System.currentTimeMillis()));
     }
 
     @Unique

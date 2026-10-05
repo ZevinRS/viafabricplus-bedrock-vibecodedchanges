@@ -21,15 +21,19 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 
+import com.viaversion.viafabricplus.bedrock.building.BedrockSprint;
 import com.viaversion.viaversion.api.minecraft.entitydata.EntityData;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.raphimc.viabedrock.api.model.entity.ClientPlayerEntity;
 import net.raphimc.viabedrock.api.model.entity.LivingEntity;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.AttributeModifierOperation;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.AttributeOperands;
 import net.raphimc.viabedrock.protocol.data.generated.java.Attributes;
 import net.raphimc.viabedrock.protocol.model.EntityAttribute;
 import org.spongepowered.asm.mixin.Mixin;
@@ -44,38 +48,79 @@ public abstract class MixinLivingEntity {
     // Java's sprint modifier, which the client adds and removes itself when it starts and stops sprinting
     private static final String JAVA_SPRINT_MODIFIER = "minecraft:sprinting";
     private static final double JAVA_SPRINT_AMOUNT = 0.3;
+    private static final int JAVA_ADD_VALUE = 0;
+    private static final int JAVA_ADD_MULTIPLIED_BASE = 1;
     private static final int JAVA_ADD_MULTIPLIED_TOTAL = 2;
+    private static final double MIN_SERVER_VALUE_DIFFERENCE = 1.0E-6;
 
     /**
-     * ViaBedrock sends the client player's speed including Bedrock's sprint boost as base value, without modifiers. The
-     * client then drops its own sprint modifier, and adds it on top of the boosted speed when it starts sprinting again,
-     * which makes it sprint 30% too fast until the server sends the speed again. So the base value is sent without
-     * the sprint boost, and the sprint boost as Java's sprint modifier, which the client replaces when it sprints.
+     * Bedrock keeps the client player's speed as base value, modifiers and the current value the server sent, which can
+     * differ from what the modifiers give (Dragonfly sends the sprinting speed as current value without modifiers). The
+     * client computes the current value from the base value again whenever its own sprint modifier is added or removed.
+     * ViaBedrock sends the current value as Java base value, so a sprint start and stop in the same tick kept the
+     * server's speed instead of going back to the base value. So the base value and the modifiers are sent as they are,
+     * the sprint boost as Java's sprint modifier, and the difference to the current value as a modifier of its own,
+     * which is dropped when Bedrock would compute the value again (see {@link BedrockSprint#SERVER_VALUE_MODIFIER}).
      */
     @Inject(method = "translateAttribute", at = @At("HEAD"), cancellable = true)
-    private void sendSprintBoostAsJavaModifier(final EntityAttribute attribute, final PacketWrapper javaAttributes, final AtomicInteger attributeCount,
-                                               final List<EntityData> javaEntityData, final CallbackInfoReturnable<Boolean> cir) {
+    private void translateClientPlayerSpeed(final EntityAttribute attribute, final PacketWrapper javaAttributes, final AtomicInteger attributeCount,
+                                            final List<EntityData> javaEntityData, final CallbackInfoReturnable<Boolean> cir) {
         if (!((Object) this instanceof ClientPlayerEntity) || !attribute.name().equals("minecraft:movement")) {
             return;
         }
-        float sprintBoost = 0F;
+        final double base = attribute.defaultValue();
+        boolean sprinting = false;
+        double add = 0;
+        double multiplyBase = 0;
+        double multiplyTotal = 1;
+        final List<JavaModifier> modifiers = new ArrayList<>();
         for (final EntityAttribute.Modifier modifier : attribute.modifiers()) {
-            if (modifier.name().equals(BEDROCK_SPRINT_MODIFIER) && modifier.operation() == AttributeModifierOperation.OPERATION_MULTIPLY_TOTAL) {
-                sprintBoost = modifier.amount();
+            if (modifier.operand() != AttributeOperands.OPERAND_CURRENT) {
+                continue;
             }
+            if (modifier.name().equals(BEDROCK_SPRINT_MODIFIER) && modifier.operation() == AttributeModifierOperation.OPERATION_MULTIPLY_TOTAL) {
+                sprinting = true;
+                multiplyTotal *= 1 + JAVA_SPRINT_AMOUNT;
+                continue;
+            }
+            final int operation;
+            if (modifier.operation() == AttributeModifierOperation.OPERATION_ADDITION) {
+                operation = JAVA_ADD_VALUE;
+                add += modifier.amount();
+            } else if (modifier.operation() == AttributeModifierOperation.OPERATION_MULTIPLY_BASE) {
+                operation = JAVA_ADD_MULTIPLIED_BASE;
+                multiplyBase += modifier.amount();
+            } else if (modifier.operation() == AttributeModifierOperation.OPERATION_MULTIPLY_TOTAL) {
+                operation = JAVA_ADD_MULTIPLIED_TOTAL;
+                multiplyTotal *= 1 + modifier.amount();
+            } else {
+                continue; // Caps end up in the difference to the current value
+            }
+            final String id = "viafabricplus_bedrock:" + modifier.id().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9/._-]", "_");
+            modifiers.add(new JavaModifier(id, modifier.amount(), operation));
         }
-        if (sprintBoost == 0F) {
-            return;
+        // Java adds values first and multiplies after, so the difference is added before the multipliers
+        final double serverValue = attribute.computeClampedValue() / ((1 + multiplyBase) * multiplyTotal) - (base + add);
+        if (Math.abs(serverValue) > MIN_SERVER_VALUE_DIFFERENCE) {
+            modifiers.add(new JavaModifier(BedrockSprint.SERVER_VALUE_MODIFIER.toString(), serverValue, JAVA_ADD_VALUE));
+        }
+        if (sprinting) {
+            modifiers.add(new JavaModifier(JAVA_SPRINT_MODIFIER, JAVA_SPRINT_AMOUNT, JAVA_ADD_MULTIPLIED_TOTAL));
         }
 
         javaAttributes.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaEntityAttributes().get(Attributes.MOVEMENT_SPEED)); // attribute id
-        javaAttributes.write(Types.DOUBLE, (double) (attribute.computeClampedValue() / (1F + sprintBoost))); // base value
-        javaAttributes.write(Types.VAR_INT, 1); // modifier count
-        javaAttributes.write(Types.STRING, JAVA_SPRINT_MODIFIER); // id
-        javaAttributes.write(Types.DOUBLE, JAVA_SPRINT_AMOUNT); // amount
-        javaAttributes.write(Types.VAR_INT, JAVA_ADD_MULTIPLIED_TOTAL); // operation
+        javaAttributes.write(Types.DOUBLE, base); // base value
+        javaAttributes.write(Types.VAR_INT, modifiers.size()); // modifier count
+        for (final JavaModifier modifier : modifiers) {
+            javaAttributes.write(Types.STRING, modifier.id()); // id
+            javaAttributes.write(Types.DOUBLE, modifier.amount()); // amount
+            javaAttributes.write(Types.VAR_INT, modifier.operation()); // operation
+        }
         attributeCount.incrementAndGet();
         cir.setReturnValue(true);
+    }
+
+    private record JavaModifier(String id, double amount, int operation) {
     }
 
 }

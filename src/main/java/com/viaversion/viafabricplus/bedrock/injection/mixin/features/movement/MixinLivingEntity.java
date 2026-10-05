@@ -22,19 +22,27 @@
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 
 import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.building.BedrockSprint;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.Vec3;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.jetbrains.annotations.Nullable;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(LivingEntity.class)
@@ -42,6 +50,28 @@ public abstract class MixinLivingEntity {
 
     @Shadow
     public abstract @Nullable MobEffectInstance getEffect(final Holder<MobEffect> effect);
+
+    @Shadow
+    @Final
+    private static Identifier SPRINTING_MODIFIER_ID;
+
+    @Shadow
+    public abstract @Nullable AttributeInstance getAttribute(final Holder<Attribute> attribute);
+
+    /**
+     * Bedrock computes the speed from its base value and modifiers again when its sprint modifier is added, or removed
+     * while there, which forgets a speed the server set beyond what its modifiers give.
+     */
+    @Inject(method = "setSprinting", at = @At("HEAD"))
+    private void computeSpeedAgain(final boolean sprinting, final CallbackInfo ci) {
+        if ((Object) this != Minecraft.getInstance().player || !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            return;
+        }
+        final AttributeInstance speed = this.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (speed != null && (sprinting || speed.getModifier(SPRINTING_MODIFIER_ID) != null)) {
+            speed.removeModifier(BedrockSprint.SERVER_VALUE_MODIFIER);
+        }
+    }
 
     @Redirect(method = "getFluidFallingAdjustedMovement", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;isSprinting()Z"))
     private boolean changeFluidGravityCondition(final LivingEntity instance) {
