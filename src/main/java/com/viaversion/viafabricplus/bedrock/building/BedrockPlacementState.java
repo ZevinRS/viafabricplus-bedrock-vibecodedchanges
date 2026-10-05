@@ -40,6 +40,7 @@ public final class BedrockPlacementState implements StorableObject {
     private BlockPosition lastPlacedPosition = new BlockPosition(0, 0, 0);
     private long placementSwingUntil;
     private long skipItemUseUntil;
+    private long finishedUsingItemUntil;
 
     // The Bedrock client only sends mob_equipment when its held items change
     private int equippedSlot = -1;
@@ -94,6 +95,19 @@ public final class BedrockPlacementState implements StorableObject {
         final boolean skip = System.nanoTime() < this.skipItemUseUntil;
         this.skipItemUseUntil = 0;
         return skip;
+    }
+
+    /**
+     * The client finished using its item, so the server saying it consumed the item comes after.
+     */
+    public void setFinishedUsingItem() {
+        this.finishedUsingItemUntil = System.nanoTime() + 2_000_000_000L;
+    }
+
+    public boolean consumeFinishedUsingItem() {
+        final boolean finished = System.nanoTime() < this.finishedUsingItemUntil;
+        this.finishedUsingItemUntil = 0;
+        return finished;
     }
 
     public boolean consumePlacementSwing() {

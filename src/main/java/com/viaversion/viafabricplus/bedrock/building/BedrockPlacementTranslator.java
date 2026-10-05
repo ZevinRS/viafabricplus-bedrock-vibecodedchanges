@@ -335,12 +335,31 @@ public final class BedrockPlacementTranslator {
     }
 
     /**
-     * Bedrock servers finish eating and drinking on their own and tell the client, like Java servers do.
+     * When eating or drinking takes long enough, Bedrock uses the item again, which makes the server consume it. The
+     * client finishes using the item right away, since not every server says when it consumed the item.
+     */
+    public static void finishUsingItem(final UserConnection user) {
+        final ClientPlayerEntity clientPlayer = user.get(EntityTracker.class).getClientPlayer();
+        final InventoryContainer inventory = user.get(InventoryTracker.class).getInventoryContainer();
+        final BedrockPlacementState state = state(user);
+        final byte slot = inventory.getSelectedHotbarSlot();
+        sendUseOnAir(user, clientPlayer, slot, state.heldItem(slot, inventory.getSelectedHotbarItem()));
+        state.nextLegacyRequestId();
+        clientPlayer.addAuthInputData(PlayerAuthInputData.StartUsingItem);
+        state.setFinishedUsingItem();
+        PacketFactory.sendJavaEntityEvent(user, clientPlayer, EntityEvent.USE_ITEM_COMPLETE);
+    }
+
+    /**
+     * Some Bedrock servers say when they consumed the item, which the client already finished using.
      */
     private static void completedUsingItem(final PacketWrapper wrapper) {
         wrapper.cancel();
         wrapper.read(BedrockTypes.SHORT_LE); // used item id
         wrapper.read(BedrockTypes.INT_LE); // use method
+        if (state(wrapper.user()).consumeFinishedUsingItem()) {
+            return;
+        }
         PacketFactory.sendJavaEntityEvent(wrapper.user(), wrapper.user().get(EntityTracker.class).getClientPlayer(), EntityEvent.USE_ITEM_COMPLETE);
     }
 

@@ -63,8 +63,8 @@ import org.jetbrains.annotations.Nullable;
  *     <li>Buckets: Bedrock uses a bucket on the liquid or block it looks at, while Java targets the block behind a
  *     liquid. The target is found like Java's bucket does before the packet is sent.</li>
  *     <li>Using items over time (eating, drinking, bows, ...): Bedrock marks the tick the use starts, and while eating
- *     or drinking sends the eating event every 4 ticks, starting 8 ticks after the use started. The server finishes
- *     eating on its own.</li>
+ *     or drinking sends the eating event every 4 ticks, starting 8 ticks after the use started. When the item's use
+ *     duration is reached, Bedrock uses the item again, which makes the server consume it.</li>
  * </ul>
  */
 public final class BedrockItemUse {
@@ -172,10 +172,17 @@ public final class BedrockItemUse {
             return;
         }
         ticksUsing++;
-        final ItemUseAnimation animation = player.getUseItem().getUseAnimation();
-        if ((animation == ItemUseAnimation.EAT || animation == ItemUseAnimation.DRINK)
-            && ticksUsing >= FIRST_EATING_EVENT_TICK && ticksUsing % EATING_EVENT_INTERVAL == 0) {
+        final ItemStack useItem = player.getUseItem();
+        final ItemUseAnimation animation = useItem.getUseAnimation();
+        if (animation != ItemUseAnimation.EAT && animation != ItemUseAnimation.DRINK) {
+            return;
+        }
+        if (ticksUsing >= FIRST_EATING_EVENT_TICK && ticksUsing % EATING_EVENT_INTERVAL == 0) {
             runOnConnection(BedrockItemUse::sendEatingEvent);
+        }
+        if (ticksUsing == useItem.getUseDuration(player)) {
+            tracking = false;
+            runOnConnection(BedrockPlacementTranslator::finishUsingItem);
         }
     }
 
