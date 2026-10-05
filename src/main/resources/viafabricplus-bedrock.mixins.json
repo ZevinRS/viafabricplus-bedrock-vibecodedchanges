@@ -61,6 +61,7 @@
     "features.movement.MixinHoneyBlock",
     "features.movement.MixinKeyboardInput",
     "features.movement.MixinLivingEntity",
+    "features.movement.MixinLivingEntity_VelocityCutoff",
     "features.movement.MixinLocalPlayer",
     "features.movement.MixinPlayer",
     "viabedrock.MixinBedrockProtocol",
