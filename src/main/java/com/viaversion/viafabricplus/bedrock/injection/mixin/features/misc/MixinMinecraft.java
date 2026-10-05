@@ -22,10 +22,18 @@
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.misc;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.building.BedrockBuilding;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.MultiPlayerGameMode;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -36,12 +44,50 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(Minecraft.class)
 public abstract class MixinMinecraft {
 
     @Shadow
     public abstract @Nullable Entity getCameraEntity();
+
+    @Shadow
+    public @Nullable LocalPlayer player;
+
+    @Inject(method = "startUseItem", at = @At("HEAD"))
+    private void startBedrockBuild(final CallbackInfo ci) {
+        if (BedrockBuilding.isActive()) {
+            BedrockBuilding.instance().startBuild();
+        }
+    }
+
+    @WrapOperation(method = "startUseItem", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/multiplayer/MultiPlayerGameMode;useItemOn(Lnet/minecraft/client/player/LocalPlayer;Lnet/minecraft/world/InteractionHand;Lnet/minecraft/world/phys/BlockHitResult;)Lnet/minecraft/world/InteractionResult;"))
+    private InteractionResult trackBedrockBuild(final MultiPlayerGameMode gameMode, final LocalPlayer player, final InteractionHand hand, final BlockHitResult hit, final Operation<InteractionResult> original) {
+        if (!BedrockBuilding.isActive() || hand != InteractionHand.MAIN_HAND) {
+            return original.call(gameMode, player, hand, hit);
+        }
+        final BlockPos placePos = BedrockBuilding.placementPosition(player, hand, hit);
+        final InteractionResult result = original.call(gameMode, player, hand, hit);
+        if (placePos != null && result instanceof InteractionResult.Success) {
+            BedrockBuilding.instance().onBlockPlaced(placePos);
+        }
+        return result;
+    }
+
+    @WrapWithCondition(method = "handleKeybinds", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;startUseItem()V", ordinal = 1))
+    private boolean replaceUseRepeatWithBedrockBuilding(final Minecraft instance) {
+        // Holding use with a block places blocks through Bedrock's building instead of repeating the click every 4 ticks
+        return !BedrockBuilding.isActive() || this.player == null || !BedrockBuilding.isHoldingBlock(this.player);
+    }
+
+    @Inject(method = "pick(F)V", at = @At("TAIL"))
+    private void continueBedrockBuild(final float partialTicks, final CallbackInfo ci) {
+        if (BedrockBuilding.isActive()) {
+            BedrockBuilding.instance().frame((Minecraft) (Object) this, partialTicks);
+        }
+    }
 
     @ModifyExpressionValue(method = "pick(F)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;raycastHitResult(FLnet/minecraft/world/entity/Entity;)Lnet/minecraft/world/phys/HitResult;"))
     private HitResult bedrockReachAroundRaycast(final HitResult hitResult) {

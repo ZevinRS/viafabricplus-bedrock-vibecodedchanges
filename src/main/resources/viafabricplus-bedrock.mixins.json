@@ -53,6 +53,7 @@
     "features.misc.MixinDialogScreen",
     "features.misc.MixinInventoryScreen",
     "features.misc.MixinMinecraft",
+    "features.misc.MixinPlayer",
     "features.movement.MixinEntity",
     "features.movement.MixinEntityFluidInteraction",
     "features.movement.MixinEntityFluidInteraction_CurrentAccumulator",
