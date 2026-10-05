@@ -335,8 +335,7 @@ public final class BedrockPlacementTranslator {
     }
 
     /**
-     * When eating or drinking takes long enough, Bedrock uses the item again, which makes the server consume it. The
-     * client finishes using the item right away, since not every server says when it consumed the item.
+     * When eating or drinking takes long enough, Bedrock uses the item again, which makes the server consume it.
      */
     public static void finishUsingItem(final UserConnection user) {
         final ClientPlayerEntity clientPlayer = user.get(EntityTracker.class).getClientPlayer();
@@ -347,7 +346,13 @@ public final class BedrockPlacementTranslator {
         state.nextLegacyRequestId();
         clientPlayer.addAuthInputData(PlayerAuthInputData.StartUsingItem);
         state.setFinishedUsingItem();
-        PacketFactory.sendJavaEntityEvent(user, clientPlayer, EntityEvent.USE_ITEM_COMPLETE);
+    }
+
+    /**
+     * The client finishes using the item on its own, since not every server says when it consumed the item.
+     */
+    public static void completeUsingItem(final UserConnection user) {
+        PacketFactory.sendJavaEntityEvent(user, user.get(EntityTracker.class).getClientPlayer(), EntityEvent.USE_ITEM_COMPLETE);
     }
 
     /**

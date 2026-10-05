@@ -22,12 +22,16 @@
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 
 import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.building.BedrockItemUse;
 import net.minecraft.client.player.LocalPlayer;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import net.minecraft.world.phys.Vec2;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(LocalPlayer.class)
 public abstract class MixinLocalPlayer {
@@ -38,6 +42,22 @@ public abstract class MixinLocalPlayer {
     @Redirect(method = {"shouldStopRunSprinting", "canStartSprinting"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;isSprintingPossible(Z)Z"))
     private boolean allowNonSwimWaterSprinting(final LocalPlayer instance, final boolean allowedInShallowWater) {
         return this.isSprintingPossible(allowedInShallowWater || ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) && (instance.isSwimming() || instance.onGround()));
+    }
+
+    @Inject(method = "modifyInput", at = @At("HEAD"))
+    private void rememberItemUseSlowdown(final Vec2 input, final CallbackInfoReturnable<Vec2> cir) {
+        final LocalPlayer player = (LocalPlayer) (Object) this;
+        BedrockItemUse.setSlowedByItemUse(player.isUsingItem() && !player.isPassenger());
+    }
+
+    /**
+     * Bedrock slows the movement input to 0.1225 while using an item, Java to 0.2.
+     */
+    @Inject(method = "itemUseSpeedMultiplier", at = @At("HEAD"), cancellable = true)
+    private void bedrockItemUseSpeed(final CallbackInfoReturnable<Float> cir) {
+        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            cir.setReturnValue(BedrockItemUse.ITEM_USE_SPEED_MULTIPLIER);
+        }
     }
 
 }

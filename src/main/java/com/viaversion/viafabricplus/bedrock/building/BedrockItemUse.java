@@ -69,6 +69,9 @@ import org.jetbrains.annotations.Nullable;
  */
 public final class BedrockItemUse {
 
+    // The movement input while using an item, as recorded from the Bedrock client
+    public static final float ITEM_USE_SPEED_MULTIPLIER = 0.1225F;
+
     private static final Queue<BucketUse> BUCKET_USES = new ConcurrentLinkedQueue<>();
     private static final long BUCKET_USE_TIMEOUT_NANOS = 1_000_000_000L;
     private static final int FIRST_EATING_EVENT_TICK = 8;
@@ -79,12 +82,24 @@ public final class BedrockItemUse {
     private static boolean tracking;
     // Whether the client repeats using the item because use is held, which Bedrock sends as simulation_tick
     private static boolean repeating;
+    // Whether the movement input of the current tick is slowed by using an item, read when the tick's input is sent
+    private static volatile boolean slowedByItemUse;
+    // The client finishes using its item a tick after Bedrock uses it again, like the Bedrock client stops being slowed
+    private static boolean finishPending;
 
     private BedrockItemUse() {
     }
 
     public static void setRepeating(final boolean repeating) {
         BedrockItemUse.repeating = repeating;
+    }
+
+    public static void setSlowedByItemUse(final boolean slowed) {
+        slowedByItemUse = slowed;
+    }
+
+    public static boolean isSlowedByItemUse() {
+        return slowedByItemUse;
     }
 
     /**
@@ -156,6 +171,7 @@ public final class BedrockItemUse {
         // Counted up at the end of this tick, so the tick using started is tick 0
         ticksUsing = -1;
         tracking = true;
+        finishPending = false;
         runOnConnection(user -> user.get(EntityTracker.class).getClientPlayer().addAuthInputData(PlayerAuthInputData.StartUsingItem));
     }
 
@@ -165,6 +181,12 @@ public final class BedrockItemUse {
     public static void tick(final Minecraft minecraft) {
         final LocalPlayer player = minecraft.player;
         if (!tracking || player == null || !BedrockBuilding.isActive()) {
+            return;
+        }
+        if (finishPending) {
+            finishPending = false;
+            tracking = false;
+            runOnConnection(BedrockPlacementTranslator::completeUsingItem);
             return;
         }
         if (!player.isUsingItem()) {
@@ -181,7 +203,7 @@ public final class BedrockItemUse {
             runOnConnection(BedrockItemUse::sendEatingEvent);
         }
         if (ticksUsing == useItem.getUseDuration(player)) {
-            tracking = false;
+            finishPending = true;
             runOnConnection(BedrockPlacementTranslator::finishUsingItem);
         }
     }
