@@ -44,11 +44,13 @@ import net.raphimc.viabedrock.protocol.storage.EntityTracker;
  * Debug tool for comparing movement with the Bedrock client: plays back the per tick input of a recorded Bedrock run
  * (keys and rotation), starting from the same position. Enabled with -Dviafabricplus.bedrock.inputReplay=path/to/replay.json,
  * started with F7. The file holds the start position and one frame per tick: yaw, pitch and the held keys as letters
- * (F forward, B backward, L left, R right, J jump, S sneak, P sprint).
+ * (F forward, B backward, L left, R right, J jump, S sneak, P sprint). Servers without a tp command can teleport
+ * through chat with -Dviafabricplus.bedrock.inputReplayTeleport=chat, which sends "!tp x y z".
  */
 public final class BedrockInputReplay {
 
     private static final String FILE = System.getProperty("viafabricplus.bedrock.inputReplay");
+    private static final boolean TELEPORT_THROUGH_CHAT = "chat".equals(System.getProperty("viafabricplus.bedrock.inputReplayTeleport"));
     private static final int TELEPORT_WAIT_TICKS = 40;
 
     private static State state = State.IDLE;
@@ -107,7 +109,11 @@ public final class BedrockInputReplay {
             ViaFabricPlusBedrock.impl().logger().error("[replay] failed to read {}", FILE, e);
             return;
         }
-        player.connection.sendCommand(String.format(Locale.ROOT, "tp @s %.5f %.5f %.5f %.3f %.3f", start[0], start[1], start[2], start[3], start[4]));
+        if (TELEPORT_THROUGH_CHAT) {
+            player.connection.sendChat(String.format(Locale.ROOT, "!tp %.5f %.5f %.5f", start[0], start[1], start[2]));
+        } else {
+            player.connection.sendCommand(String.format(Locale.ROOT, "tp @s %.5f %.5f %.5f %.3f %.3f", start[0], start[1], start[2], start[3], start[4]));
+        }
         waitTicks = TELEPORT_WAIT_TICKS;
         state = State.TELEPORTING;
         ViaFabricPlusBedrock.impl().logger().info("[replay] teleporting to the start of {} frames", FRAMES.size());
