@@ -69,6 +69,9 @@ public final class BedrockBuilding {
 
     private static final BedrockBuilding INSTANCE = new BedrockBuilding();
 
+    // Whether the click that starts holding use was handled. Java sets the use key down as soon as it's pressed, but only
+    // handles the click on the next tick, so building would otherwise start before the click and place an extra block.
+    private boolean building;
     private boolean hasBuildDirection;
     private boolean hasLastBuiltPosition;
     private BlockPos lastBuiltPosition = BlockPos.ZERO;
@@ -105,11 +108,13 @@ public final class BedrockBuilding {
             }
             ViaFabricPlusBedrock.impl().logger().info("[build] start (use down={}) from {}", Minecraft.getInstance().options.keyUse.isDown(), from);
         }
+        this.building = true;
         this.hasBuildDirection = false;
         this.hasLastBuiltPosition = false;
     }
 
     public void stopBuild() {
+        this.building = false;
         this.hasBuildDirection = false;
         this.hasLastBuiltPosition = false;
     }
@@ -152,7 +157,7 @@ public final class BedrockBuilding {
             this.stopBuild();
             return;
         }
-        if (!isHoldingBlock(player) || player.isSpectator()) {
+        if (!this.building || !isHoldingBlock(player) || player.isSpectator()) {
             return;
         }
 
