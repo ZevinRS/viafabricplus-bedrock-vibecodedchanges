@@ -21,31 +21,37 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.ViaFabricPlus;
-import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.Vec3;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.injection.Constant;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
+import org.spongepowered.asm.mixin.injection.At;
 
-/**
- * Applied before ViaFabricPlus, which changes the same constant for 1.8 and older, so its value is kept for those.
- */
-@Mixin(value = LivingEntity.class, priority = 900)
+@Mixin(LivingEntity.class)
 public abstract class MixinLivingEntity_VelocityCutoff {
+
+    private static final double BEDROCK_VELOCITY_CUTOFF = 1.0E-7;
 
     /**
      * Java zeroes velocity components below 0.003 every tick, Bedrock only lets them decay to about 1e-7, as recorded from
      * the Bedrock client. For example, a small sideways speed while running against a wall carries into a jump on Bedrock.
+     * The velocity is set again from before Java's cutoff, since ViaFabricPlus already changes the cutoff constant.
      */
-    @ModifyConstant(method = "aiStep", constant = @Constant(doubleValue = 0.003))
-    private double bedrockVelocityCutoff(final double cutoff) {
-        final ProtocolVersion version = ViaFabricPlus.api().targetVersion();
-        if (version.equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
-            return 1.0E-7;
+    @WrapOperation(method = "aiStep", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;setDeltaMovement(DDD)V"))
+    private void bedrockVelocityCutoff(final LivingEntity instance, final double x, final double y, final double z, final Operation<Void> original) {
+        if (!ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            original.call(instance, x, y, z);
+            return;
         }
-        return version.olderThanOrEqualTo(ProtocolVersion.v1_8) ? 0.005 : cutoff;
+        final Vec3 velocity = instance.getDeltaMovement();
+        original.call(instance, cutoff(velocity.x), cutoff(velocity.y), cutoff(velocity.z));
+    }
+
+    private static double cutoff(final double value) {
+        return Math.abs(value) < BEDROCK_VELOCITY_CUTOFF ? 0.0 : value;
     }
 
 }
