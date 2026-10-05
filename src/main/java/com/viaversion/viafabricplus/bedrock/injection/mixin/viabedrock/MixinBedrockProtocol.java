@@ -22,6 +22,7 @@
 package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 
 import com.viaversion.viafabricplus.bedrock.building.BedrockPlacementTranslator;
+import com.viaversion.viafabricplus.bedrock.inventory.BedrockInventoryTranslator;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -34,6 +35,7 @@ public abstract class MixinBedrockProtocol {
     @Inject(method = "registerPackets", at = @At("TAIL"))
     private void sendPlacementsLikeBedrock(final CallbackInfo ci) {
         BedrockPlacementTranslator.register((BedrockProtocol) (Object) this);
+        BedrockInventoryTranslator.register((BedrockProtocol) (Object) this);
     }
 
 }

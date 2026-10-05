@@ -22,11 +22,11 @@
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.misc;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
-import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.building.BedrockBuilding;
+import com.viaversion.viafabricplus.bedrock.building.BedrockItemUse;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.client.player.LocalPlayer;
@@ -76,10 +76,22 @@ public abstract class MixinMinecraft {
         return result;
     }
 
-    @WrapWithCondition(method = "handleKeybinds", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;startUseItem()V", ordinal = 1))
-    private boolean replaceUseRepeatWithBedrockBuilding(final Minecraft instance) {
+    @WrapOperation(method = "handleKeybinds", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;startUseItem()V", ordinal = 1))
+    private void replaceUseRepeatWithBedrockBuilding(final Minecraft instance, final Operation<Void> original) {
+        if (!BedrockBuilding.isActive() || this.player == null) {
+            original.call(instance);
+            return;
+        }
         // Holding use with a block places blocks through Bedrock's building instead of repeating the click every 4 ticks
-        return !BedrockBuilding.isActive() || this.player == null || !BedrockBuilding.isHoldingBlock(this.player);
+        if (BedrockBuilding.isHoldingBlock(this.player)) {
+            return;
+        }
+        BedrockItemUse.setRepeating(true);
+        try {
+            original.call(instance);
+        } finally {
+            BedrockItemUse.setRepeating(false);
+        }
     }
 
     @Inject(method = "pick(F)V", at = @At("TAIL"))
@@ -87,6 +99,11 @@ public abstract class MixinMinecraft {
         if (BedrockBuilding.isActive()) {
             BedrockBuilding.instance().frame((Minecraft) (Object) this, partialTicks);
         }
+    }
+
+    @Inject(method = "tick", at = @At("TAIL"))
+    private void tickBedrockItemUse(final CallbackInfo ci) {
+        BedrockItemUse.tick((Minecraft) (Object) this);
     }
 
     @ModifyExpressionValue(method = "pick(F)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;raycastHitResult(FLnet/minecraft/world/entity/Entity;)Lnet/minecraft/world/phys/HitResult;"))

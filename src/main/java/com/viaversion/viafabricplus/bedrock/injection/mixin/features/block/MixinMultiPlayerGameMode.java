@@ -24,6 +24,7 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.features.block;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.building.BedrockBuilding;
+import com.viaversion.viafabricplus.bedrock.building.BedrockItemUse;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
@@ -31,7 +32,9 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.phys.BlockHitResult;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.spongepowered.asm.mixin.Mixin;
@@ -57,9 +60,13 @@ public abstract class MixinMultiPlayerGameMode {
     @Unique
     private boolean viaFabricPlusBedrock$placingBlock;
 
+    @Unique
+    private boolean viaFabricPlusBedrock$usingBucket;
+
     @Inject(method = "performUseItemOn", at = @At("HEAD"))
     private void checkPlacingBlock(final LocalPlayer player, final InteractionHand hand, final BlockHitResult hit, final CallbackInfoReturnable<InteractionResult> cir) {
         this.viaFabricPlusBedrock$placingBlock = hand == InteractionHand.MAIN_HAND && player.getMainHandItem().getItem() instanceof BlockItem && BedrockBuilding.isActive();
+        this.viaFabricPlusBedrock$usingBucket = hand == InteractionHand.MAIN_HAND && player.getMainHandItem().getItem() instanceof BucketItem && BedrockBuilding.isActive();
     }
 
     /**
@@ -70,6 +77,28 @@ public abstract class MixinMultiPlayerGameMode {
         if (this.viaFabricPlusBedrock$placingBlock) {
             this.viaFabricPlusBedrock$placingBlock = false;
             BedrockBuilding.recordPlacement(hit, cir.getReturnValue());
+        }
+        if (this.viaFabricPlusBedrock$usingBucket) {
+            this.viaFabricPlusBedrock$usingBucket = false;
+            BedrockItemUse.recordBucketUse(player, true, cir.getReturnValue().consumesAction());
+        }
+    }
+
+    /**
+     * Bedrock uses buckets on what they look at, which is found before the packet is sent.
+     */
+    @Inject(method = "useItem", at = @At("HEAD"))
+    private void recordBucketUse(final Player player, final InteractionHand hand, final CallbackInfoReturnable<InteractionResult> cir) {
+        if (hand == InteractionHand.MAIN_HAND && player instanceof final LocalPlayer localPlayer && !player.isSpectator()
+            && player.getMainHandItem().getItem() instanceof BucketItem && BedrockBuilding.isActive()) {
+            BedrockItemUse.recordBucketUse(localPlayer, false, false);
+        }
+    }
+
+    @Inject(method = "useItem", at = @At("RETURN"))
+    private void startUsingItem(final Player player, final InteractionHand hand, final CallbackInfoReturnable<InteractionResult> cir) {
+        if (hand == InteractionHand.MAIN_HAND && player instanceof final LocalPlayer localPlayer) {
+            BedrockItemUse.onItemUsed(localPlayer);
         }
     }
 

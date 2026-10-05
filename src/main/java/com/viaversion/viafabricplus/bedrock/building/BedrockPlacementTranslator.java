@@ -34,9 +34,11 @@ import net.raphimc.viabedrock.api.model.container.player.InventoryContainer;
 import net.raphimc.viabedrock.api.model.entity.ClientPlayerEntity;
 import net.raphimc.viabedrock.api.util.PacketFactory;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
+import net.raphimc.viabedrock.protocol.ClientboundBedrockPackets;
 import net.raphimc.viabedrock.protocol.PlayerActionPacketFactory;
 import net.raphimc.viabedrock.protocol.ServerboundBedrockPackets;
 import net.raphimc.viabedrock.protocol.data.enums.Direction;
+import net.raphimc.viabedrock.protocol.data.enums.java.EntityEvent;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.ComplexInventoryTransaction_Type;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ActorSwingSource;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.AnimatePacketPayload_Action;
@@ -78,6 +80,7 @@ import net.raphimc.viabedrock.protocol.types.BedrockTypes;
  *     <li>failed placements without request id, item change or swing</li>
  *     <li>simulation_tick as trigger for placements of held use (see {@link BedrockBuilding})</li>
  *     <li>the held item with its predicted count after each placement</li>
+ *     <li>buckets used like block placements on the liquid or block looked at (see {@link BedrockItemUse})</li>
  * </ul>
  * Every item use transaction takes a legacy request id, even the ones sent without it.
  */
@@ -90,6 +93,7 @@ public final class BedrockPlacementTranslator {
         protocol.replaceServerbound(ServerboundPackets26_3.USE_ITEM_ON, BedrockPlacementTranslator::useItemOn);
         protocol.replaceServerbound(ServerboundPackets26_3.USE_ITEM, BedrockPlacementTranslator::useItem);
         protocol.replaceServerbound(ServerboundPackets26_3.PUNCH, BedrockPlacementTranslator::punch);
+        protocol.replaceClientbound(ClientboundBedrockPackets.COMPLETED_USING_ITEM, BedrockPlacementTranslator::completedUsingItem);
     }
 
     public static BedrockPlacementState state(final UserConnection user) {
@@ -123,6 +127,12 @@ public final class BedrockPlacementTranslator {
 
         final BlockFace face = direction.blockFace();
         final BlockPosition placePosition = insideBlock ? position : position.getRelative(face);
+        final BedrockItemUse.BucketUse bucketUse = BedrockItemUse.pollBucketUse(true);
+        if (bucketUse != null && !bucketUse.interaction()) { // The client uses the bucket after this, which already sends everything
+            useBucket(user, state, bucketUse, position, faceId);
+            state.skipNextItemUse();
+            return;
+        }
         final BedrockBuilding.Placement placement = BedrockBuilding.pollPlacement(position.x(), position.y(), position.z(), faceId);
         if (placement == null) { // Not a block placement, for example opening a door
             useItemOnLikeViaBedrock(user, clientPlayer, inventory, chunkTracker, position, placePosition, faceId, javaClickPosition);
@@ -132,16 +142,12 @@ public final class BedrockPlacementTranslator {
         final boolean simulated = placement.simulated();
         final byte slot = inventory.getSelectedHotbarSlot();
         final BedrockItem heldItem = state.heldItem(slot, inventory.getSelectedHotbarItem());
-        final int legacyRequestId = state.nextLegacyRequestId();
         final ItemUseTriggerType trigger = simulated ? ItemUseTriggerType.Simulation_Tick : ItemUseTriggerType.Player_Input;
         final Position3f clickPosition = simulated ? placement.simulatedClickPosition() : javaClickPosition;
         final int blockRuntimeId = state.blockState(position, chunkTracker.getBlockState(position));
 
         if (placement.result() != BedrockBuilding.Placement.Result.SUCCESS) {
-            sendTransaction(user, new BedrockInventoryTransaction(0, null, null, ComplexInventoryTransaction_Type.ItemUseTransaction,
-                new InventoryTransactionData.UseItemTransactionData(ItemUseActionType.Place, trigger, position, faceId, slot, HandSlot.Mainhand,
-                    heldItem, clientPlayer.position(), clickPosition, blockRuntimeId, ItemUsePredictedResult.Failure, ItemUseClientCooldownState.Off)
-            ));
+            sendFailedUseOn(user, state, clientPlayer, slot, heldItem, trigger, position, faceId, clickPosition, blockRuntimeId);
             // When the placement passed, the client goes on to use the item, which sends the use on air
             if (!simulated && placement.result() == BedrockBuilding.Placement.Result.FAIL) {
                 sendUseOnAir(user, clientPlayer, slot, heldItem);
@@ -150,14 +156,6 @@ public final class BedrockPlacementTranslator {
             return;
         }
 
-        if (!simulated) { // A click starts using the item on blocks
-            PlayerActionPacketFactory.sendBedrockPlayerAction(user, clientPlayer.runtimeId(), PlayerActionType.StartItemUseOn, position, placePosition, faceId);
-            state.setUsingItemOn(true);
-        }
-
-        sendSwing(user, clientPlayer, ActorSwingSource.Build);
-        state.expectPlacementSwing();
-
         BedrockItem predictedItem = heldItem.copy();
         if (predictedItem.blockRuntimeId() != 0 && clientPlayer.javaGameMode() != GameMode.CREATIVE) {
             predictedItem.setAmount(predictedItem.amount() - 1);
@@ -165,6 +163,81 @@ public final class BedrockPlacementTranslator {
         if (predictedItem.amount() <= 0) {
             predictedItem = BedrockItem.empty();
         }
+
+        sendUseOn(user, state, clientPlayer, slot, heldItem, predictedItem, trigger, position, faceId, clickPosition, blockRuntimeId, position, placePosition, faceId);
+        state.setLastPlacedPosition(placePosition);
+        if (heldItem.blockRuntimeId() != 0) {
+            state.predictBlock(placePosition, heldItem.blockRuntimeId());
+        }
+    }
+
+    /**
+     * Using a bucket, which Bedrock sends like a block placement on the liquid or block it looks at.
+     *
+     * @param javaPosition the block the client used the bucket on, or null if it only used the bucket in the air
+     */
+    private static void useBucket(final UserConnection user, final BedrockPlacementState state, final BedrockItemUse.BucketUse bucketUse, final BlockPosition javaPosition, final int javaFace) {
+        final ClientPlayerEntity clientPlayer = user.get(EntityTracker.class).getClientPlayer();
+        final InventoryContainer inventory = user.get(InventoryTracker.class).getInventoryContainer();
+        final byte slot = inventory.getSelectedHotbarSlot();
+        final BedrockItem heldItem = state.heldItem(slot, inventory.getSelectedHotbarItem());
+        final BlockPosition target = bucketUse.target();
+        final ItemUseTriggerType trigger = bucketUse.repeated() ? ItemUseTriggerType.Simulation_Tick : ItemUseTriggerType.Player_Input;
+        if (target == null) { // Nothing in reach
+            if (bucketUse.repeated()) {
+                return;
+            }
+            sendUseOnAir(user, clientPlayer, slot, heldItem);
+            state.nextLegacyRequestId();
+            return;
+        }
+
+        final int blockRuntimeId = state.blockState(target, user.get(ChunkTracker.class).getBlockState(target));
+        final Integer predictedId = bucketUse.predictedItem() != null ? user.get(ItemRewriter.class).getItems().get(bucketUse.predictedItem()) : null;
+        if (predictedId == null) { // For example an empty bucket on a block without liquid
+            sendFailedUseOn(user, state, clientPlayer, slot, heldItem, trigger, target, bucketUse.face(), bucketUse.clickPosition(), blockRuntimeId);
+            if (!bucketUse.repeated()) {
+                sendUseOnAir(user, clientPlayer, slot, heldItem);
+                state.nextLegacyRequestId();
+            }
+            return;
+        }
+
+        final BedrockItem predictedItem;
+        if (clientPlayer.javaGameMode() == GameMode.CREATIVE) {
+            predictedItem = heldItem.copy();
+        } else if (heldItem.amount() > 1) { // Stacked empty buckets, the filled one goes to another slot
+            predictedItem = heldItem.copy();
+            predictedItem.setAmount(heldItem.amount() - 1);
+        } else {
+            predictedItem = new BedrockItem(predictedId, (short) 0, (byte) 1);
+        }
+
+        final BlockPosition startPosition = javaPosition != null ? javaPosition : target;
+        final int startFace = javaPosition != null ? javaFace : bucketUse.face();
+        sendUseOn(user, state, clientPlayer, slot, heldItem, predictedItem, trigger, target, bucketUse.face(), bucketUse.clickPosition(), blockRuntimeId,
+            startPosition, target, startFace);
+        state.setLastPlacedPosition(target);
+    }
+
+    /**
+     * A successful use of the held item on a block.
+     *
+     * @param startPosition       the block the use starts on, which is the looked at block even when a bucket is used on liquid
+     * @param startResultPosition the block the use results in
+     */
+    private static void sendUseOn(final UserConnection user, final BedrockPlacementState state, final ClientPlayerEntity clientPlayer, final byte slot,
+                                  final BedrockItem heldItem, final BedrockItem predictedItem, final ItemUseTriggerType trigger, final BlockPosition position, final int faceId,
+                                  final Position3f clickPosition, final int blockRuntimeId, final BlockPosition startPosition, final BlockPosition startResultPosition, final int startFace) {
+        final boolean simulated = trigger == ItemUseTriggerType.Simulation_Tick;
+        final int legacyRequestId = state.nextLegacyRequestId();
+        if (!simulated) { // A click starts using the item on blocks
+            PlayerActionPacketFactory.sendBedrockPlayerAction(user, clientPlayer.runtimeId(), PlayerActionType.StartItemUseOn, startPosition, startResultPosition, startFace);
+            state.setUsingItemOn(true);
+        }
+
+        sendSwing(user, clientPlayer, ActorSwingSource.Build);
+        state.expectPlacementSwing();
 
         sendTransaction(user, new BedrockInventoryTransaction(
             legacyRequestId,
@@ -189,10 +262,18 @@ public final class BedrockPlacementTranslator {
             mobEquipment.write(Types.BYTE, (byte) ContainerID.CONTAINER_ID_INVENTORY.getValue()); // container id
             mobEquipment.sendToServer(BedrockProtocol.class);
         }
-        state.setLastPlacedPosition(placePosition);
-        if (heldItem.blockRuntimeId() != 0) {
-            state.predictBlock(placePosition, heldItem.blockRuntimeId());
-        }
+    }
+
+    /**
+     * A failed use of the held item on a block, which takes a legacy request id but is sent without it.
+     */
+    private static void sendFailedUseOn(final UserConnection user, final BedrockPlacementState state, final ClientPlayerEntity clientPlayer, final byte slot, final BedrockItem heldItem,
+                                        final ItemUseTriggerType trigger, final BlockPosition position, final int faceId, final Position3f clickPosition, final int blockRuntimeId) {
+        state.nextLegacyRequestId();
+        sendTransaction(user, new BedrockInventoryTransaction(0, null, null, ComplexInventoryTransaction_Type.ItemUseTransaction,
+            new InventoryTransactionData.UseItemTransactionData(ItemUseActionType.Place, trigger, position, faceId, slot, HandSlot.Mainhand,
+                heldItem, clientPlayer.position(), clickPosition, blockRuntimeId, ItemUsePredictedResult.Failure, ItemUseClientCooldownState.Off)
+        ));
     }
 
     /**
@@ -237,11 +318,30 @@ public final class BedrockPlacementTranslator {
         }
 
         final UserConnection user = wrapper.user();
-        final InventoryContainer inventory = user.get(InventoryTracker.class).getInventoryContainer();
         final BedrockPlacementState state = state(user);
+        final BedrockItemUse.BucketUse bucketUse = BedrockItemUse.pollBucketUse(false);
+        if (state.consumeSkippedItemUse()) { // Already sent when the client used the bucket on a block
+            return;
+        }
+        if (bucketUse != null && !bucketUse.interaction()) {
+            useBucket(user, state, bucketUse, null, 0);
+            return;
+        }
+
+        final InventoryContainer inventory = user.get(InventoryTracker.class).getInventoryContainer();
         final byte slot = inventory.getSelectedHotbarSlot();
         sendUseOnAir(user, user.get(EntityTracker.class).getClientPlayer(), slot, state.heldItem(slot, inventory.getSelectedHotbarItem()));
         state.nextLegacyRequestId();
+    }
+
+    /**
+     * Bedrock servers finish eating and drinking on their own and tell the client, like Java servers do.
+     */
+    private static void completedUsingItem(final PacketWrapper wrapper) {
+        wrapper.cancel();
+        wrapper.read(BedrockTypes.SHORT_LE); // used item id
+        wrapper.read(BedrockTypes.INT_LE); // use method
+        PacketFactory.sendJavaEntityEvent(wrapper.user(), wrapper.user().get(EntityTracker.class).getClientPlayer(), EntityEvent.USE_ITEM_COMPLETE);
     }
 
     /**
