@@ -68,6 +68,9 @@ public abstract class MixinLivingEntity {
         if ((Object) this != Minecraft.getInstance().player || !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
             return;
         }
+        if (sprinting != ((LivingEntity) (Object) this).isSprinting()) {
+            BedrockSprint.onSprintChange(sprinting);
+        }
         final AttributeInstance speed = this.getAttribute(Attributes.MOVEMENT_SPEED);
         if (speed != null && (sprinting || speed.getModifier(SPRINTING_MODIFIER_ID) != null)) {
             speed.removeModifier(BedrockSprint.SERVER_VALUE_MODIFIER);

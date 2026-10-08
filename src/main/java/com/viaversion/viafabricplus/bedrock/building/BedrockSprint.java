@@ -31,6 +31,10 @@ public final class BedrockSprint {
     // The part of the server's movement speed its modifiers don't explain, which Bedrock forgets when its sprint modifier changes
     public static final Identifier SERVER_VALUE_MODIFIER = Identifier.fromNamespaceAndPath("viafabricplus_bedrock", "server_value");
 
+    // Whether the player started and stopped sprinting during the current tick
+    private static boolean startedThisTick;
+    private static boolean stoppedThisTick;
+
     // Ticks the player has been swimming for since it last started swimming, counting the tick it started in
     private static int ticksSinceSwimStart;
 
@@ -38,6 +42,31 @@ public final class BedrockSprint {
     private static boolean mainAxisBlocked;
 
     private BedrockSprint() {
+    }
+
+    public static void onTickStart() {
+        startedThisTick = stoppedThisTick = false;
+    }
+
+    public static void onSprintChange(final boolean sprinting) {
+        if (sprinting) {
+            startedThisTick = true;
+        } else {
+            stoppedThisTick = true;
+        }
+    }
+
+    /**
+     * Java only tells the server about a change of the sprinting it has at the end of the tick, compared to what it
+     * last told it. Bedrock sends a start and a stop for every start and stop during the tick, for example both every
+     * tick it keeps trying to sprint into a wall, and a start again when the server stopped the sprinting.
+     */
+    public static boolean startedThisTick() {
+        return startedThisTick;
+    }
+
+    public static boolean stoppedThisTick() {
+        return stoppedThisTick;
     }
 
     public static void onSwimStart() {

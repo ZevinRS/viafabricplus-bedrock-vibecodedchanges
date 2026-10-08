@@ -29,6 +29,10 @@ import com.viaversion.viafabricplus.bedrock.building.BedrockSprint;
 import com.viaversion.viafabricplus.bedrock.building.BedrockItemUse;
 import net.minecraft.client.player.LocalPlayer;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
+import net.raphimc.viabedrock.protocol.storage.EntityTracker;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.PlayerAuthInputData;
+import net.raphimc.viabedrock.api.model.entity.ClientPlayerEntity;
+import com.viaversion.viaversion.api.connection.UserConnection;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import net.minecraft.world.phys.Vec2;
@@ -44,9 +48,38 @@ public abstract class MixinLocalPlayer {
     @Shadow
     protected abstract boolean isSprintingPossible(final boolean allowedInShallowWater);
 
+    /**
+     * Bedrock only keeps the player from sprinting in water while it jumps there without swimming or standing on the
+     * ground, as recorded: sprinting into the water kept the sprint, pressing sprint while jumping in the water started
+     * and stopped it every tick.
+     */
     @Redirect(method = {"shouldStopRunSprinting", "canStartSprinting"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;isSprintingPossible(Z)Z"))
-    private boolean allowNonSwimWaterSprinting(final LocalPlayer instance, final boolean allowedInShallowWater) {
-        return this.isSprintingPossible(allowedInShallowWater || ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) && (instance.isSwimming() || instance.onGround()));
+    private boolean bedrockWaterSprinting(final LocalPlayer instance, final boolean allowedInShallowWater) {
+        if (!ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            return this.isSprintingPossible(allowedInShallowWater);
+        }
+        final boolean jumpingInWater = instance.isInWater() && !instance.isSwimming() && !instance.onGround() && instance.input.keyPresses.jump();
+        return this.isSprintingPossible(true) && !jumpingInWater;
+    }
+
+    @Inject(method = "tick", at = @At("HEAD"))
+    private void rememberSprintingAtTickStart(final CallbackInfo ci) {
+        BedrockSprint.onTickStart();
+    }
+
+    @Inject(method = "sendPosition", at = @At("HEAD"))
+    private void sendSprintStartAndStop(final CallbackInfo ci) {
+        final UserConnection connection = ViaFabricPlus.api().userConnection();
+        if (connection == null || !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            return;
+        }
+        final ClientPlayerEntity player = connection.get(EntityTracker.class).getClientPlayer();
+        if (BedrockSprint.startedThisTick()) {
+            player.addAuthInputData(PlayerAuthInputData.StartSprinting);
+        }
+        if (BedrockSprint.stoppedThisTick()) {
+            player.addAuthInputData(PlayerAuthInputData.StopSprinting);
+        }
     }
 
     // Pressing back doesn't cancel a double tap of forward to sprint on Bedrock, as recorded with forward and back held for a tick
