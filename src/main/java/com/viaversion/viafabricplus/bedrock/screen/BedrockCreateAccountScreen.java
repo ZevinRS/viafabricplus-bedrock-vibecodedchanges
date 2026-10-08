@@ -41,13 +41,19 @@ public final class BedrockCreateAccountScreen extends VFPScreen {
 
     public static final Component TITLE = Component.translatable("screen.viafabricplus.bedrock_create_account");
 
-    private static final String SIGN_UP = "https://signup.live.com/signup?lic=1";
+    // Outlook's "Create free account", which makes a new @outlook.com address instead of asking for an existing one
+    private static final String SIGN_UP = "https://go.microsoft.com/fwlink/p/?linkid=2125440";
+    private static final String ADDRESS_CHARACTERS = "abcdefghijkmnopqrstuvwxyz23456789";
+    private static final int ADDRESS_LENGTH = 14;
     private static final String PASSWORD_CHARACTERS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!#$%&*+-=?@";
     private static final int PASSWORD_LENGTH = 20;
-    private static final int STEP_HEIGHT = 56;
-    private static final int BUTTON_WIDTH = 146;
+    private static final int STEP_HEIGHT = 64;
+    private static final int BUTTON_WIDTH = 96;
+    private static final int BUTTON_GAP = 6;
     private static final int SECONDARY_COLOR = 0xFFB8B8B8;
 
+    private final SecureRandom random = new SecureRandom();
+    private @Nullable String address;
     private @Nullable String password;
     // The account in use when the login was started, to notice when the new one was added
     private @Nullable BedrockAuthManager accountBeforeLogin;
@@ -62,8 +68,10 @@ public final class BedrockCreateAccountScreen extends VFPScreen {
         final int left = this.width / 2 - 150;
         this.addRenderableWidget(Button.builder(Component.translatable("bedrock_create_account.viafabricplus.open_sign_up"), _ -> open(SIGN_UP))
             .pos(left, this.stepTop(0) + 26).size(BUTTON_WIDTH, 20).build());
+        this.addRenderableWidget(Button.builder(Component.translatable("bedrock_create_account.viafabricplus.copy_address"), _ -> this.copyAddress())
+            .pos(left + BUTTON_WIDTH + BUTTON_GAP, this.stepTop(0) + 26).size(BUTTON_WIDTH, 20).build());
         this.addRenderableWidget(Button.builder(Component.translatable("bedrock_create_account.viafabricplus.copy_password"), _ -> this.copyPassword())
-            .pos(left + BUTTON_WIDTH + 8, this.stepTop(0) + 26).size(BUTTON_WIDTH, 20).build());
+            .pos(left + (BUTTON_WIDTH + BUTTON_GAP) * 2, this.stepTop(0) + 26).size(BUTTON_WIDTH, 20).build());
         this.addRenderableWidget(Button.builder(Component.translatable("bedrock_create_account.viafabricplus.open_xbox"), _ -> open(BedrockAccount.XBOX_SIGN_IN))
             .pos(left, this.stepTop(1) + 26).size(BUTTON_WIDTH, 20).build());
         this.addRenderableWidget(Button.builder(Component.translatable("bedrock_create_account.viafabricplus.log_in"), _ -> this.logIn())
@@ -96,29 +104,44 @@ public final class BedrockCreateAccountScreen extends VFPScreen {
             graphics.text(this.font, Component.translatable("bedrock_create_account.viafabricplus.step" + step), left, top, ACCENT_COLOR);
             graphics.text(this.font, Component.translatable("bedrock_create_account.viafabricplus.step" + step + ".detail"), left, top + 12, SECONDARY_COLOR);
         }
+        if (this.address != null) {
+            graphics.text(this.font, this.address + "@outlook.com", left, this.stepTop(0) + 50, -1);
+        }
         if (this.password != null) {
-            graphics.text(this.font, Component.translatable("bedrock_create_account.viafabricplus.password", this.password),
-                left + BUTTON_WIDTH + 8, this.stepTop(0) + 50, SECONDARY_COLOR);
+            graphics.text(this.font, this.password, left + (BUTTON_WIDTH + BUTTON_GAP) * 2, this.stepTop(0) + 50, -1);
         }
     }
 
     private int stepTop(final int step) {
-        return 40 + step * STEP_HEIGHT;
+        return 34 + step * STEP_HEIGHT;
     }
 
     private static void open(final String url) {
         PrivateBrowser.open(url);
     }
 
+    /**
+     * Copies a random name for the new address, which the sign-up page completes with @outlook.com. Names have to
+     * start with a letter.
+     */
+    private void copyAddress() {
+        this.address = (char) ('a' + this.random.nextInt(26)) + this.randomString(ADDRESS_CHARACTERS, ADDRESS_LENGTH - 1);
+        Minecraft.getInstance().keyboardHandler.setClipboard(this.address);
+        VFPScreen.showToast(Component.translatable("bedrock_create_account.viafabricplus.address_copied"));
+    }
+
     private void copyPassword() {
-        final SecureRandom random = new SecureRandom();
-        final StringBuilder password = new StringBuilder(PASSWORD_LENGTH);
-        for (int i = 0; i < PASSWORD_LENGTH; i++) {
-            password.append(PASSWORD_CHARACTERS.charAt(random.nextInt(PASSWORD_CHARACTERS.length())));
-        }
-        this.password = password.toString();
+        this.password = this.randomString(PASSWORD_CHARACTERS, PASSWORD_LENGTH);
         Minecraft.getInstance().keyboardHandler.setClipboard(this.password);
         VFPScreen.showToast(Component.translatable("bedrock_create_account.viafabricplus.password_copied"));
+    }
+
+    private String randomString(final String characters, final int length) {
+        final StringBuilder builder = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            builder.append(characters.charAt(this.random.nextInt(characters.length())));
+        }
+        return builder.toString();
     }
 
     private void logIn() {
