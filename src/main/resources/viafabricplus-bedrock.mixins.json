@@ -73,6 +73,7 @@
     "viabedrock.MixinLivingEntity",
     "viabedrock.MixinOffhandContainer",
     "viabedrock.MixinResourcePackLoadStateTracker",
+    "viabedrock.MixinResourcePackPackets",
     "viabedrock.MixinRespawnGameModeEncoding"
   ],
   "injectors": {
