@@ -35,7 +35,9 @@ import com.viaversion.viafabricplus.bedrock.building.BedrockInputReplay;
 import com.viaversion.viafabricplus.bedrock.building.BedrockSprint;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
@@ -64,6 +66,21 @@ public abstract class MixinEntity {
 
     @Shadow
     public abstract boolean isSwimming();
+
+    /**
+     * Bedrock starts swimming as soon as the block at the eyes holds water, not only once the eyes are below the water
+     * surface a tick ago, and not while looking up (SwimTriggerSystem::doTick), as recorded when sinking into water.
+     */
+    @Inject(method = "updateSwimming", at = @At("HEAD"), cancellable = true)
+    private void bedrockSwimStart(final CallbackInfo ci) {
+        final Entity entity = (Entity) (Object) this;
+        if (this.isSwimming() || !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            return;
+        }
+        final boolean eyesInWater = entity.level().getFluidState(BlockPos.containing(entity.getX(), entity.getEyeY(), entity.getZ())).is(FluidTags.WATER);
+        entity.setSwimming(entity.isSprinting() && eyesInWater && entity.getLookAngle().y < 0.15 && !entity.isPassenger());
+        ci.cancel();
+    }
 
     @Inject(method = "setSwimming", at = @At("HEAD"))
     private void trackSwimming(final boolean swimming, final CallbackInfo ci) {

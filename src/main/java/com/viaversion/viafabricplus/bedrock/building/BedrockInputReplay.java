@@ -49,7 +49,8 @@ import net.raphimc.viabedrock.protocol.storage.EntityTracker;
  * Debug tool for comparing movement with the Bedrock client: plays back the per tick input of a recorded Bedrock run
  * (keys and rotation), starting from the same position. Enabled with -Dviafabricplus.bedrock.inputReplay=path/to/replay.json,
  * started with F7. The file holds the start position and one frame per tick: yaw, pitch and the held keys as letters
- * (F forward, B backward, L left, R right, J jump, S sneak, P sprint). Servers without a tp command can teleport
+ * (F forward, B backward, L left, R right, J jump, S sneak, P sprint). A replay that starts in the middle of a run also
+ * holds the velocity and sprinting to start with. Servers without a tp command can teleport
  * through chat with -Dviafabricplus.bedrock.inputReplayTeleport=chat, which sends "!tp x y z".
  * With -Dviafabricplus.bedrock.inputReplayAuto=host:port the client joins that server from the title screen, plays the
  * replay once the world loaded and closes the game afterwards, so runs need no one at the keyboard.
@@ -71,6 +72,9 @@ public final class BedrockInputReplay {
     private static int waitTicks;
     private static int frameIndex;
     private static double[] start;
+    // Velocity and sprinting of the Bedrock player when the replay starts in the middle of a run, or null
+    private static double[] startVelocity;
+    private static boolean startSprinting;
     private static final List<Frame> FRAMES = new ArrayList<>();
 
     private BedrockInputReplay() {
@@ -130,6 +134,10 @@ public final class BedrockInputReplay {
         if (state == State.TELEPORTING && --waitTicks <= 0) {
             frameIndex = 0;
             state = State.PLAYING;
+            if (startVelocity != null) {
+                minecraft.player.setDeltaMovement(startVelocity[0], startVelocity[1], startVelocity[2]);
+                minecraft.player.setSprinting(startSprinting);
+            }
             ViaFabricPlusBedrock.impl().logger().info("[replay] playing {} frames, first tick {}", FRAMES.size(), lastSentTick() + 1);
         }
     }
@@ -140,6 +148,12 @@ public final class BedrockInputReplay {
             final JsonObject startJson = json.getAsJsonObject("start");
             start = new double[]{startJson.get("x").getAsDouble(), startJson.get("y").getAsDouble(), startJson.get("z").getAsDouble(),
                 startJson.get("yaw").getAsDouble(), startJson.get("pitch").getAsDouble()};
+            startVelocity = null;
+            if (startJson.has("velocity")) {
+                final JsonArray velocity = startJson.getAsJsonArray("velocity");
+                startVelocity = new double[]{velocity.get(0).getAsDouble(), velocity.get(1).getAsDouble(), velocity.get(2).getAsDouble()};
+                startSprinting = startJson.has("sprinting") && startJson.get("sprinting").getAsBoolean();
+            }
             FRAMES.clear();
             for (final JsonElement element : json.getAsJsonArray("frames")) {
                 final JsonArray frame = element.getAsJsonArray();
