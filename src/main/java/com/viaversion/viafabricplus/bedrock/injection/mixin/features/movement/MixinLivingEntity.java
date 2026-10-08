@@ -23,6 +23,7 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.building.BedrockDimensionChange;
 import com.viaversion.viafabricplus.bedrock.building.BedrockImmobile;
 import com.viaversion.viafabricplus.bedrock.building.BedrockSprint;
 import net.minecraft.client.Minecraft;
@@ -64,11 +65,12 @@ public abstract class MixinLivingEntity {
 
     /**
      * An immobile player doesn't move at all on Bedrock, not even by gravity, and its velocity is cleared every tick.
-     * Looking around and the input it sends stay the same.
+     * Looking around and the input it sends stay the same. Neither does a player in the loading screen of a dimension
+     * change.
      */
     @Inject(method = "travel", at = @At("HEAD"), cancellable = true)
     private void stayWhileImmobile(final Vec3 input, final CallbackInfo ci) {
-        if ((Object) this == Minecraft.getInstance().player && BedrockImmobile.isImmobile()
+        if ((Object) this == Minecraft.getInstance().player && (BedrockImmobile.isImmobile() || BedrockDimensionChange.isLoading())
             && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
             ((LivingEntity) (Object) this).setDeltaMovement(Vec3.ZERO);
             ci.cancel();

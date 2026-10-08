@@ -25,6 +25,7 @@ import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.building.BedrockDimensionChange;
 import com.viaversion.viafabricplus.bedrock.building.BedrockSprint;
 import com.viaversion.viafabricplus.bedrock.building.BedrockAuthInput;
 import com.viaversion.viafabricplus.bedrock.building.BedrockItemUse;
@@ -63,6 +64,17 @@ public abstract class MixinLocalPlayer {
         final boolean inWater = instance.isInWater() || BedrockSprint.wasInWaterLastTick();
         final boolean jumpingInWater = inWater && !instance.isSwimming() && !instance.onGround() && instance.input.keyPresses.jump();
         return this.isSprintingPossible(true) && !jumpingInWater;
+    }
+
+    /**
+     * Bedrock keeps sprinting through the loading screen of a dimension change and only stops once it acknowledged
+     * the change, even though it ignores the keys in between.
+     */
+    @Inject(method = {"shouldStopRunSprinting", "shouldStopSwimSprinting"}, at = @At("HEAD"), cancellable = true)
+    private void keepSprintingWhileLoading(final CallbackInfoReturnable<Boolean> cir) {
+        if (BedrockDimensionChange.isLoading() && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            cir.setReturnValue(false);
+        }
     }
 
     @Inject(method = "tick", at = @At("HEAD"))

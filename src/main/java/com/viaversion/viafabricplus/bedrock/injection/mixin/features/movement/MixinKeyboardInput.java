@@ -21,11 +21,14 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 
+import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.building.BedrockDimensionChange;
 import com.viaversion.viafabricplus.bedrock.building.BedrockInputReplay;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.ClientInput;
 import net.minecraft.client.player.KeyboardInput;
 import net.minecraft.world.phys.Vec2;
+import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -43,6 +46,12 @@ public abstract class MixinKeyboardInput extends ClientInput {
         final Vec2 moveVector = BedrockInputReplay.applyFrame(minecraft.player, this);
         if (moveVector != null) {
             this.moveVector = moveVector;
+        }
+        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            final Vec2 filtered = BedrockDimensionChange.filterInput(this);
+            if (filtered != null) {
+                this.moveVector = filtered;
+            }
         }
     }
 

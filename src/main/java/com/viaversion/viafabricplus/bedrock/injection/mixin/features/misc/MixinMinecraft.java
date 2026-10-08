@@ -26,6 +26,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.building.BedrockBuilding;
+import com.viaversion.viafabricplus.bedrock.building.BedrockDimensionChange;
 import com.viaversion.viafabricplus.bedrock.building.BedrockInputReplay;
 import com.viaversion.viafabricplus.bedrock.building.BedrockItemUse;
 import com.viaversion.viafabricplus.bedrock.building.BedrockPacketDelay;
@@ -108,6 +109,7 @@ public abstract class MixinMinecraft {
         BedrockItemUse.tick((Minecraft) (Object) this);
         BedrockInputReplay.tick((Minecraft) (Object) this);
         BedrockPacketDelay.tick((Minecraft) (Object) this);
+        BedrockDimensionChange.tick((Minecraft) (Object) this);
     }
 
     @ModifyExpressionValue(method = "pick(F)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;raycastHitResult(FLnet/minecraft/world/entity/Entity;)Lnet/minecraft/world/phys/HitResult;"))

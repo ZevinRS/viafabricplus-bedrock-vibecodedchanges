@@ -31,6 +31,11 @@ import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.PlayerAuthIn
 import net.raphimc.viabedrock.protocol.model.Position2f;
 import net.raphimc.viabedrock.protocol.model.Position3f;
 import net.raphimc.viabedrock.protocol.packet.ClientPlayerPackets;
+import com.viaversion.viafabricplus.bedrock.building.BedrockDimensionChange;
+import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
+import net.raphimc.viabedrock.protocol.storage.EntityTracker;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
@@ -70,6 +75,17 @@ public abstract class MixinClientPlayerPackets {
     private static float bedrockInteractYaw(final Position3f rotation, final Operation<Float> original) {
         final float yaw = original.call(rotation);
         return ((yaw + 270F) % 360F + 360F) % 360F - 270F;
+    }
+
+    /**
+     * The Bedrock client keeps saying it sprints in the loading screen of a dimension change, where it ignores the
+     * sprint key, see {@link BedrockDimensionChange}.
+     */
+    @Inject(method = "lambda$register$18", at = @At("HEAD"))
+    private static void keepSprintingFlagWhileLoading(final PacketWrapper wrapper, final CallbackInfo ci) {
+        if (BedrockDimensionChange.sendsSprinting()) {
+            wrapper.user().get(EntityTracker.class).getClientPlayer().addAuthInputData(PlayerAuthInputData.Sprinting);
+        }
     }
 
 }

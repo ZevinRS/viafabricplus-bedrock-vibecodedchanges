@@ -24,6 +24,7 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.building.BedrockDimensionChange;
 import com.viaversion.viafabricplus.bedrock.building.BedrockImmobile;
 import com.viaversion.viafabricplus.bedrock.building.BedrockKnockback;
 import com.viaversion.viafabricplus.bedrock.building.BedrockPacketDelay;
@@ -90,6 +91,13 @@ public abstract class MixinClientPacketListener {
     private void takeImmobileFlag(final CallbackInfo ci) {
         if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
             BedrockImmobile.setImmobile(BedrockImmobile.serverFlag());
+        }
+    }
+
+    @Inject(method = "handleRespawn", at = @At("TAIL"))
+    private void startDimensionChangeLoading(final CallbackInfo ci) {
+        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            BedrockDimensionChange.onRespawnHandled();
         }
     }
 
