@@ -23,6 +23,7 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.building.BedrockImmobile;
 import com.viaversion.viafabricplus.bedrock.building.BedrockSprint;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.Holder;
@@ -60,6 +61,19 @@ public abstract class MixinLivingEntity {
 
     @Shadow
     public abstract @Nullable AttributeInstance getAttribute(final Holder<Attribute> attribute);
+
+    /**
+     * An immobile player doesn't move at all on Bedrock, not even by gravity, and its velocity is cleared every tick.
+     * Looking around and the input it sends stay the same.
+     */
+    @Inject(method = "travel", at = @At("HEAD"), cancellable = true)
+    private void stayWhileImmobile(final Vec3 input, final CallbackInfo ci) {
+        if ((Object) this == Minecraft.getInstance().player && BedrockImmobile.isImmobile()
+            && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            ((LivingEntity) (Object) this).setDeltaMovement(Vec3.ZERO);
+            ci.cancel();
+        }
+    }
 
     /**
      * Bedrock computes the speed from its base value and modifiers again when its sprint modifier is added, or removed

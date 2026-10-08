@@ -24,6 +24,7 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.building.BedrockImmobile;
 import com.viaversion.viafabricplus.bedrock.building.BedrockKnockback;
 import com.viaversion.viafabricplus.bedrock.building.BedrockPacketDelay;
 import net.minecraft.client.Minecraft;
@@ -69,9 +70,23 @@ public abstract class MixinClientPacketListener {
 
     @Inject(method = "handleSetEntityData", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/protocol/PacketUtils;ensureRunningOnSameThread(Lnet/minecraft/network/protocol/Packet;Lnet/minecraft/network/PacketListener;Lnet/minecraft/network/PacketProcessor;)V", shift = At.Shift.AFTER), cancellable = true)
     private void applyEntityDataLater(final ClientboundSetEntityDataPacket packet, final CallbackInfo ci) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)
-            && BedrockPacketDelay.hold(packet, packet.id(), BedrockPacketDelay.ENTITY_DATA_MOVES, ClientPacketListener::handleSetEntityData)) {
+        if (!ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            return;
+        }
+        // The immobile flag has no Java entity data, so it's taken from the flags of the packet and applied with it
+        final boolean immobile = BedrockImmobile.serverFlag();
+        if (BedrockPacketDelay.hold(packet, packet.id(), BedrockPacketDelay.ENTITY_DATA_MOVES, (listener, held) -> {
+            listener.handleSetEntityData(held);
+            BedrockImmobile.setImmobile(immobile);
+        })) {
             ci.cancel();
+        }
+    }
+
+    @Inject(method = {"handleLogin", "handleRespawn"}, at = @At("TAIL"))
+    private void takeImmobileFlag(final CallbackInfo ci) {
+        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            BedrockImmobile.setImmobile(BedrockImmobile.serverFlag());
         }
     }
 

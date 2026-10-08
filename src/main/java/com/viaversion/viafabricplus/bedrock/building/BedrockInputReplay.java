@@ -57,7 +57,8 @@ import net.raphimc.viabedrock.protocol.storage.EntityTracker;
  * through chat with -Dviafabricplus.bedrock.inputReplayTeleport=chat, which sends "!tp x y z".
  * With -Dviafabricplus.bedrock.inputReplayAuto=host:port the client joins that server from the title screen, plays the
  * replay once the world loaded and closes the game afterwards, so runs need no one at the keyboard. With
- * -Dviafabricplus.bedrock.inputReplayStopAfterSplit=ticks the replay ends that many ticks after the player first got
+ * -Dviafabricplus.bedrock.inputReplayChat=frame:message the client sends a chat message before that frame, like a test
+ * server command. With -Dviafabricplus.bedrock.inputReplayStopAfterSplit=ticks the replay ends that many ticks after the player first got
  * further than 0.05 from the recorded Bedrock position. A replay can list the velocities the server set for the Bedrock
  * player with the frame it first used each in ("motions"); the client then uses those in the same frames and ignores the
  * ones the server sets for it, so network timing can't make the runs differ.
@@ -71,6 +72,7 @@ public final class BedrockInputReplay {
     private static final int AUTO_START_TICKS = 100;
     private static final int AUTO_QUIT_TICKS = 40;
     private static final int STOP_AFTER_SPLIT = Integer.getInteger("viafabricplus.bedrock.inputReplayStopAfterSplit", -1);
+    private static final String CHAT = System.getProperty("viafabricplus.bedrock.inputReplayChat");
     private static final double SPLIT_DISTANCE = 0.05;
     // The client player's eye height, which the recorded Bedrock positions are at
     private static final double EYE_HEIGHT = 1.62;
@@ -243,6 +245,10 @@ public final class BedrockInputReplay {
             state = State.DONE;
             ViaFabricPlusBedrock.impl().logger().info("[replay] done, last tick {}", lastSentTick());
             return null;
+        }
+        if (CHAT != null && CHAT.startsWith(frameIndex + ":")) {
+            player.connection.sendChat(CHAT.substring(CHAT.indexOf(':') + 1));
+            ViaFabricPlusBedrock.impl().logger().info("[replay] sent \"{}\" before frame {}", CHAT.substring(CHAT.indexOf(':') + 1), frameIndex);
         }
         final Frame frame = FRAMES.get(frameIndex++);
         player.setYRot(frame.yaw);
