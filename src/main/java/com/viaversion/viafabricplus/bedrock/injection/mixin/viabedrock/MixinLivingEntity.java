@@ -26,6 +26,7 @@ import com.viaversion.viaversion.api.minecraft.entitydata.EntityData;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -37,6 +38,7 @@ import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.AttributeOpe
 import net.raphimc.viabedrock.protocol.data.generated.java.Attributes;
 import net.raphimc.viabedrock.protocol.model.EntityAttribute;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -53,6 +55,10 @@ public abstract class MixinLivingEntity {
     private static final int JAVA_ADD_MULTIPLIED_TOTAL = 2;
     private static final double MIN_SERVER_VALUE_DIFFERENCE = 1.0E-6;
 
+    // The client player's movement speed as the server sent it last
+    @Unique
+    private EntityAttribute viaFabricPlusBedrock$lastMovement;
+
     /**
      * Bedrock keeps the client player's speed as base value, modifiers and the current value the server sent, which can
      * differ from what the modifiers give (Dragonfly sends the sprinting speed as current value without modifiers). The
@@ -68,6 +74,14 @@ public abstract class MixinLivingEntity {
         if (!((Object) this instanceof ClientPlayerEntity) || !attribute.name().equals("minecraft:movement")) {
             return;
         }
+        // Bedrock only acts on a changed value. Dragonfly sends the speed again with every other attribute, which on Java
+        // would replace the sprint modifier the client added since, as recorded when a hunger update came right after
+        // a sprint start.
+        if (viaFabricPlusBedrock$sameValue(attribute, this.viaFabricPlusBedrock$lastMovement)) {
+            cir.setReturnValue(true);
+            return;
+        }
+        this.viaFabricPlusBedrock$lastMovement = attribute;
         final double base = attribute.defaultValue();
         boolean sprinting = false;
         double add = 0;
@@ -118,6 +132,12 @@ public abstract class MixinLivingEntity {
         }
         attributeCount.incrementAndGet();
         cir.setReturnValue(true);
+    }
+
+    @Unique
+    private static boolean viaFabricPlusBedrock$sameValue(final EntityAttribute attribute, final EntityAttribute last) {
+        return last != null && attribute.currentValue() == last.currentValue() && attribute.defaultValue() == last.defaultValue()
+            && attribute.minValue() == last.minValue() && attribute.maxValue() == last.maxValue() && Arrays.equals(attribute.modifiers(), last.modifiers());
     }
 
     private record JavaModifier(String id, double amount, int operation) {
