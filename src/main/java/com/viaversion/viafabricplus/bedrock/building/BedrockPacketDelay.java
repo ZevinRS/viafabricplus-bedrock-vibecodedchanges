@@ -30,11 +30,14 @@ import java.util.function.BiConsumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * The Bedrock client acts on some server updates of its own player later than Java, counted from the last
  * player_auth_input it sent before they arrived, as recorded on Dragonfly: a velocity the server sets is used from the
- * second move after that input on, and a movement speed from the third. Java uses them for the next move. Those
+ * second move after that input on, and so are its entity flags (a sprinting flag the server sends back), and a movement
+ * speed from the third. Java uses them for the next move. Those
  * packets are held back until the client sent the input before that move. Only used on the render thread.
  */
 public final class BedrockPacketDelay {
@@ -42,6 +45,7 @@ public final class BedrockPacketDelay {
     // How many moves after the last sent input the update is first used for
     public static final int ATTRIBUTE_MOVES = 3;
     public static final int MOTION_MOVES = 2;
+    public static final int ENTITY_DATA_MOVES = 2;
 
     private static final Deque<Pending<?>> PENDING = new ArrayDeque<>();
     private static boolean applying;
@@ -68,11 +72,35 @@ public final class BedrockPacketDelay {
     }
 
     /**
+     * During a replay with the recorded velocities of the Bedrock run, the server's velocities for the player are ignored.
+     *
+     * @return whether the velocity is ignored
+     */
+    public static boolean ignoreMotion(final int entityId) {
+        final Minecraft minecraft = Minecraft.getInstance();
+        if (applying || minecraft.player == null || entityId != minecraft.player.getId() || !BedrockInputReplay.usesRecordedMotion()) {
+            return false;
+        }
+        ViaFabricPlusBedrock.impl().logger().info("[replay-packet] ignored the server's motion after frame {}", BedrockInputReplay.frameIndex() - 1);
+        return true;
+    }
+
+    /**
      * Called at the end of every client tick, after the tick's input was sent.
      */
     public static void tick(final Minecraft minecraft) {
         if (minecraft.player != null) {
             sentTicks++;
+            final Vec3 recordedMotion = BedrockInputReplay.pollRecordedMotion();
+            if (recordedMotion != null && minecraft.getConnection() != null) {
+                ViaFabricPlusBedrock.impl().logger().info("[replay-packet] applied recorded motion after frame {}", BedrockInputReplay.frameIndex() - 1);
+                applying = true;
+                try {
+                    minecraft.getConnection().handleSetEntityMotion(new ClientboundSetEntityMotionPacket(minecraft.player.getId(), recordedMotion));
+                } finally {
+                    applying = false;
+                }
+            }
         }
         if (PENDING.isEmpty()) {
             return;

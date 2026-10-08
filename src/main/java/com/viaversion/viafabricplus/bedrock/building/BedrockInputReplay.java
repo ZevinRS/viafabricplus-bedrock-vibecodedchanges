@@ -31,7 +31,9 @@ import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
@@ -42,6 +44,7 @@ import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 
@@ -55,7 +58,9 @@ import net.raphimc.viabedrock.protocol.storage.EntityTracker;
  * With -Dviafabricplus.bedrock.inputReplayAuto=host:port the client joins that server from the title screen, plays the
  * replay once the world loaded and closes the game afterwards, so runs need no one at the keyboard. With
  * -Dviafabricplus.bedrock.inputReplayStopAfterSplit=ticks the replay ends that many ticks after the player first got
- * further than 0.05 from the recorded Bedrock position.
+ * further than 0.05 from the recorded Bedrock position. A replay can list the velocities the server set for the Bedrock
+ * player with the frame it first used each in ("motions"); the client then uses those in the same frames and ignores the
+ * ones the server sets for it, so network timing can't make the runs differ.
  */
 public final class BedrockInputReplay {
 
@@ -83,6 +88,9 @@ public final class BedrockInputReplay {
     private static boolean startSprinting;
     private static final List<Frame> FRAMES = new ArrayList<>();
     private static final List<double[]> POSITIONS = new ArrayList<>();
+    // Frame and velocity of every velocity the server set for the Bedrock player
+    private static final Deque<double[]> MOTIONS = new ArrayDeque<>();
+    private static boolean recordedMotion;
     private static int splitFrame;
 
     private BedrockInputReplay() {
@@ -94,6 +102,26 @@ public final class BedrockInputReplay {
 
     public static int frameIndex() {
         return frameIndex;
+    }
+
+    /**
+     * @return whether the velocities the server sets for the player are replaced with the recorded ones
+     */
+    public static boolean usesRecordedMotion() {
+        return state == State.PLAYING && recordedMotion;
+    }
+
+    /**
+     * Called at the end of every client tick.
+     *
+     * @return the recorded velocity the player uses from its next move on, or null
+     */
+    public static Vec3 pollRecordedMotion() {
+        if (!usesRecordedMotion() || MOTIONS.isEmpty() || MOTIONS.peek()[0] > frameIndex) {
+            return null;
+        }
+        final double[] motion = MOTIONS.poll();
+        return new Vec3(motion[1], motion[2], motion[3]);
     }
 
     /**
@@ -168,6 +196,14 @@ public final class BedrockInputReplay {
             }
             FRAMES.clear();
             POSITIONS.clear();
+            MOTIONS.clear();
+            recordedMotion = json.has("motions");
+            if (recordedMotion) {
+                for (final JsonElement element : json.getAsJsonArray("motions")) {
+                    final JsonArray motion = element.getAsJsonArray();
+                    MOTIONS.add(new double[]{motion.get(0).getAsInt(), motion.get(1).getAsDouble(), motion.get(2).getAsDouble(), motion.get(3).getAsDouble()});
+                }
+            }
             if (json.has("positions")) {
                 for (final JsonElement element : json.getAsJsonArray("positions")) {
                     final JsonArray position = element.getAsJsonArray();

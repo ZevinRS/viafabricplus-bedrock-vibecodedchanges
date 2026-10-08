@@ -29,6 +29,7 @@ import com.viaversion.viafabricplus.bedrock.building.BedrockPacketDelay;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket;
 import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
 import net.minecraft.network.protocol.game.ClientboundUpdateAttributesPacket;
 import net.minecraft.world.entity.Entity;
@@ -61,7 +62,15 @@ public abstract class MixinClientPacketListener {
     @Inject(method = "handleSetEntityMotion", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/protocol/PacketUtils;ensureRunningOnSameThread(Lnet/minecraft/network/protocol/Packet;Lnet/minecraft/network/PacketListener;Lnet/minecraft/network/PacketProcessor;)V", shift = At.Shift.AFTER), cancellable = true)
     private void applyMotionLater(final ClientboundSetEntityMotionPacket packet, final CallbackInfo ci) {
         if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)
-            && BedrockPacketDelay.hold(packet, packet.id(), BedrockPacketDelay.MOTION_MOVES, ClientPacketListener::handleSetEntityMotion)) {
+            && (BedrockPacketDelay.ignoreMotion(packet.id()) || BedrockPacketDelay.hold(packet, packet.id(), BedrockPacketDelay.MOTION_MOVES, ClientPacketListener::handleSetEntityMotion))) {
+            ci.cancel();
+        }
+    }
+
+    @Inject(method = "handleSetEntityData", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/protocol/PacketUtils;ensureRunningOnSameThread(Lnet/minecraft/network/protocol/Packet;Lnet/minecraft/network/PacketListener;Lnet/minecraft/network/PacketProcessor;)V", shift = At.Shift.AFTER), cancellable = true)
+    private void applyEntityDataLater(final ClientboundSetEntityDataPacket packet, final CallbackInfo ci) {
+        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)
+            && BedrockPacketDelay.hold(packet, packet.id(), BedrockPacketDelay.ENTITY_DATA_MOVES, ClientPacketListener::handleSetEntityData)) {
             ci.cancel();
         }
     }
