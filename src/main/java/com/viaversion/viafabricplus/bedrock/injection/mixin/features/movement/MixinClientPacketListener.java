@@ -29,6 +29,7 @@ import com.viaversion.viafabricplus.bedrock.building.BedrockPacketDelay;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
 import net.minecraft.network.protocol.game.ClientboundUpdateAttributesPacket;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
@@ -52,7 +53,15 @@ public abstract class MixinClientPacketListener {
     @Inject(method = "handleUpdateAttributes", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/protocol/PacketUtils;ensureRunningOnSameThread(Lnet/minecraft/network/protocol/Packet;Lnet/minecraft/network/PacketListener;Lnet/minecraft/network/PacketProcessor;)V", shift = At.Shift.AFTER), cancellable = true)
     private void applyAttributesLater(final ClientboundUpdateAttributesPacket packet, final CallbackInfo ci) {
         if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)
-            && BedrockPacketDelay.hold(packet, packet.getEntityId(), BedrockPacketDelay.ATTRIBUTE_TICKS, ClientPacketListener::handleUpdateAttributes)) {
+            && BedrockPacketDelay.hold(packet, packet.getEntityId(), BedrockPacketDelay.ATTRIBUTE_MOVES, ClientPacketListener::handleUpdateAttributes)) {
+            ci.cancel();
+        }
+    }
+
+    @Inject(method = "handleSetEntityMotion", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/protocol/PacketUtils;ensureRunningOnSameThread(Lnet/minecraft/network/protocol/Packet;Lnet/minecraft/network/PacketListener;Lnet/minecraft/network/PacketProcessor;)V", shift = At.Shift.AFTER), cancellable = true)
+    private void applyMotionLater(final ClientboundSetEntityMotionPacket packet, final CallbackInfo ci) {
+        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)
+            && BedrockPacketDelay.hold(packet, packet.id(), BedrockPacketDelay.MOTION_MOVES, ClientPacketListener::handleSetEntityMotion)) {
             ci.cancel();
         }
     }

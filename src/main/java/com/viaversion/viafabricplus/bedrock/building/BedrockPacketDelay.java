@@ -31,16 +31,21 @@ import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.protocol.Packet;
 
 /**
- * The Bedrock client acts on some server updates of its own player later than Java, as recorded on Dragonfly: the
- * movement speed it sends right after a sprint stop still applies to the next two moves. Those packets are held back
- * for that many client ticks. Only used on the render thread.
+ * The Bedrock client acts on some server updates of its own player later than Java, counted from the last
+ * player_auth_input it sent before they arrived, as recorded on Dragonfly: a velocity the server sets is used from the
+ * second move after that input on, and a movement speed from the third. Java uses them for the next move. Those
+ * packets are held back until the client sent the input before that move. Only used on the render thread.
  */
 public final class BedrockPacketDelay {
 
-    public static final int ATTRIBUTE_TICKS = 2;
+    // How many moves after the last sent input the update is first used for
+    public static final int ATTRIBUTE_MOVES = 3;
+    public static final int MOTION_MOVES = 2;
 
     private static final Deque<Pending<?>> PENDING = new ArrayDeque<>();
     private static boolean applying;
+    // Ticks the client player moved and sent its input in, counted on the render thread
+    private static long sentTicks;
 
     private BedrockPacketDelay() {
     }
@@ -48,19 +53,23 @@ public final class BedrockPacketDelay {
     /**
      * @return whether the packet was held back
      */
-    public static <T extends Packet<?>> boolean hold(final T packet, final int entityId, final int ticks, final BiConsumer<ClientPacketListener, T> handler) {
+    public static <T extends Packet<?>> boolean hold(final T packet, final int entityId, final int moves, final BiConsumer<ClientPacketListener, T> handler) {
         final Minecraft minecraft = Minecraft.getInstance();
         if (applying || minecraft.player == null || entityId != minecraft.player.getId()) {
             return false;
         }
-        PENDING.add(new Pending<>(packet, handler, new int[]{ticks}));
+        // Applied at the end of the tick that sends the input before the move it is used for
+        PENDING.add(new Pending<>(packet, handler, sentTicks + moves - 1));
         return true;
     }
 
     /**
-     * Called at the end of every client tick.
+     * Called at the end of every client tick, after the tick's input was sent.
      */
     public static void tick(final Minecraft minecraft) {
+        if (minecraft.player != null) {
+            sentTicks++;
+        }
         if (PENDING.isEmpty()) {
             return;
         }
@@ -71,10 +80,7 @@ public final class BedrockPacketDelay {
         }
         // Packets are applied in the order they arrived, so one is only due when all before it are
         final List<Pending<?>> due = new ArrayList<>();
-        for (final Pending<?> pending : PENDING) {
-            pending.ticksLeft[0]--;
-        }
-        while (!PENDING.isEmpty() && PENDING.peek().ticksLeft[0] <= 0) {
+        while (!PENDING.isEmpty() && PENDING.peek().dueTick <= sentTicks) {
             due.add(PENDING.poll());
         }
         applying = true;
@@ -87,7 +93,7 @@ public final class BedrockPacketDelay {
         }
     }
 
-    private record Pending<T extends Packet<?>>(T packet, BiConsumer<ClientPacketListener, T> handler, int[] ticksLeft) {
+    private record Pending<T extends Packet<?>>(T packet, BiConsumer<ClientPacketListener, T> handler, long dueTick) {
 
         void apply(final ClientPacketListener connection) {
             this.handler.accept(connection, this.packet);

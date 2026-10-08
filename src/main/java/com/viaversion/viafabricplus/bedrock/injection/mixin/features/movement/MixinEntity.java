@@ -156,6 +156,26 @@ public abstract class MixinEntity {
         }
     }
 
+    @Shadow
+    protected abstract double getEffectiveGravity();
+
+    /**
+     * Bedrock bounces the player off a block with the speed it hits the block with, which gravity sped up over the part
+     * of the move before the hit, while Java approximates that with a share of the gravity and drag of the move, as
+     * recorded when landing on slime blocks.
+     */
+    @WrapOperation(method = "restituteMovementAfterCollisions", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/phys/Vec3;with(Lnet/minecraft/core/Direction$Axis;D)Lnet/minecraft/world/phys/Vec3;", ordinal = 2))
+    private Vec3 bedrockBounce(final Vec3 movementAfterBounce, final Direction.Axis axis, final double bounce, final Operation<Vec3> original,
+                               @Local(argsOnly = true) final Vec3 movement, @Local(name = "restitution") final double restitution) {
+        final Entity entity = (Entity) (Object) this;
+        if (restitution <= 0 || entity != Minecraft.getInstance().player || !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            return original.call(movementAfterBounce, axis, bounce);
+        }
+        final double velocity = entity.getDeltaMovement().y;
+        final double hitSpeed = Math.sqrt(velocity * velocity + 2 * this.getEffectiveGravity() * Math.abs(movement.y));
+        return original.call(movementAfterBounce, axis, hitSpeed * restitution);
+    }
+
     @Unique
     private Vec3 viaFabricPlusBedrock$moveFrom;
 
