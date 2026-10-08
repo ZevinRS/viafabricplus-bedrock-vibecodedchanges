@@ -37,6 +37,7 @@ import com.viaversion.viaversion.api.connection.UserConnection;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -80,6 +81,47 @@ public abstract class MixinEntity {
         final boolean eyesInWater = entity.level().getFluidState(BlockPos.containing(entity.getX(), entity.getEyeY(), entity.getZ())).is(FluidTags.WATER);
         entity.setSwimming(entity.isSprinting() && eyesInWater && entity.getLookAngle().y < 0.15 && !entity.isPassenger());
         ci.cancel();
+    }
+
+    /**
+     * Bedrock takes the friction of the block below the player's center, not of the block it is supported by, as
+     * recorded when walking off the edge of a slime block: Bedrock had normal friction once the center was past the
+     * edge, while the slime still slowed the player down as long as it stood on it.
+     */
+    @Inject(method = "getBlockPosBelowThatAffectsMyMovement", at = @At("HEAD"), cancellable = true)
+    private void frictionBelowCenter(final CallbackInfoReturnable<BlockPos> cir) {
+        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            final Entity entity = (Entity) (Object) this;
+            cir.setReturnValue(BlockPos.containing(entity.getX(), entity.getY() - 0.500001, entity.getZ()));
+        }
+    }
+
+    @Unique
+    private Vec3 viaFabricPlusBedrock$moveFrom;
+
+    @Inject(method = "move", at = @At("HEAD"))
+    private void rememberMoveStart(final MoverType type, final Vec3 movement, final CallbackInfo ci) {
+        if (type == MoverType.SELF) {
+            this.viaFabricPlusBedrock$moveFrom = ((Entity) (Object) this).position();
+        }
+    }
+
+    /**
+     * Bedrock applies the effect of the block the player stands on, like the slowdown of slime, only while the block
+     * is below the player's position before the move with a box reaching 0.2 from the center, like it does for water,
+     * as recorded when walking off the edge of a slime block. Java uses the block supporting the player after the move.
+     */
+    @WrapOperation(method = "applyEffectsFromBlocks(Ljava/util/List;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity;getOnPosLegacy()Lnet/minecraft/core/BlockPos;"))
+    private BlockPos bedrockSteppedOnBlock(final Entity instance, final Operation<BlockPos> original) {
+        final BlockPos pos = original.call(instance);
+        final Vec3 from = this.viaFabricPlusBedrock$moveFrom;
+        if (from == null || !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            return pos;
+        }
+        final double halfWidth = 0.2;
+        final boolean below = pos.getX() + 1 > from.x - halfWidth && pos.getX() < from.x + halfWidth
+            && pos.getZ() + 1 > from.z - halfWidth && pos.getZ() < from.z + halfWidth;
+        return below ? pos : BlockPos.containing(from.x, from.y - 0.2, from.z);
     }
 
     @Inject(method = "setSwimming", at = @At("HEAD"))
@@ -183,12 +225,15 @@ public abstract class MixinEntity {
         final Vec3 collided = this.viaFabricPlusBedrock$replayCollided;
         final Vec3 velocity = entity.getDeltaMovement();
         ViaFabricPlusBedrock.impl().logger().info(String.format(java.util.Locale.ROOT,
-            "[replay-move] frame=%d intended=(%.5f,%.5f,%.5f) collided=(%.5f,%.5f,%.5f) velocity=(%.5f,%.5f,%.5f) onGround=%s horizontal=%s minor=%s vertical=%s speed=%.4f sprinting=%s swimming=%s inWater=%s underWater=%s t=%d",
+            "[replay-move] frame=%d intended=(%.5f,%.5f,%.5f) collided=(%.5f,%.5f,%.5f) velocity=(%.5f,%.5f,%.5f) onGround=%s horizontal=%s minor=%s vertical=%s speed=%.4f sprinting=%s swimming=%s inWater=%s underWater=%s feet=%s below=%s t=%d",
             BedrockInputReplay.frameIndex() - 1, movement.x, movement.y, movement.z,
             collided != null ? collided.x : Double.NaN, collided != null ? collided.y : Double.NaN, collided != null ? collided.z : Double.NaN,
             velocity.x, velocity.y, velocity.z, entity.onGround(), entity.horizontalCollision, entity.minorHorizontalCollision, entity.verticalCollision,
             entity instanceof final LivingEntity living ? living.getAttributeValue(Attributes.MOVEMENT_SPEED) : Double.NaN,
-            entity.isSprinting(), entity.isSwimming(), entity.isInWater(), entity.isUnderWater(), System.currentTimeMillis()));
+            entity.isSprinting(), entity.isSwimming(), entity.isInWater(), entity.isUnderWater(),
+            BuiltInRegistries.BLOCK.getKey(entity.level().getBlockState(entity.blockPosition()).getBlock()).getPath(),
+            BuiltInRegistries.BLOCK.getKey(entity.level().getBlockState(BlockPos.containing(entity.getX(), entity.getY() - 0.5, entity.getZ())).getBlock()).getPath(),
+            System.currentTimeMillis()));
     }
 
     @Unique

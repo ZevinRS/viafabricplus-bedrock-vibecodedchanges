@@ -53,7 +53,9 @@ import net.raphimc.viabedrock.protocol.storage.EntityTracker;
  * holds the velocity and sprinting to start with. Servers without a tp command can teleport
  * through chat with -Dviafabricplus.bedrock.inputReplayTeleport=chat, which sends "!tp x y z".
  * With -Dviafabricplus.bedrock.inputReplayAuto=host:port the client joins that server from the title screen, plays the
- * replay once the world loaded and closes the game afterwards, so runs need no one at the keyboard.
+ * replay once the world loaded and closes the game afterwards, so runs need no one at the keyboard. With
+ * -Dviafabricplus.bedrock.inputReplayStopAfterSplit=ticks the replay ends that many ticks after the player first got
+ * further than 0.05 from the recorded Bedrock position.
  */
 public final class BedrockInputReplay {
 
@@ -63,6 +65,10 @@ public final class BedrockInputReplay {
     private static final String AUTO_SERVER = System.getProperty("viafabricplus.bedrock.inputReplayAuto");
     private static final int AUTO_START_TICKS = 100;
     private static final int AUTO_QUIT_TICKS = 40;
+    private static final int STOP_AFTER_SPLIT = Integer.getInteger("viafabricplus.bedrock.inputReplayStopAfterSplit", -1);
+    private static final double SPLIT_DISTANCE = 0.05;
+    // The client player's eye height, which the recorded Bedrock positions are at
+    private static final double EYE_HEIGHT = 1.62;
 
     private static boolean autoConnected;
     private static int autoTicks;
@@ -76,6 +82,8 @@ public final class BedrockInputReplay {
     private static double[] startVelocity;
     private static boolean startSprinting;
     private static final List<Frame> FRAMES = new ArrayList<>();
+    private static final List<double[]> POSITIONS = new ArrayList<>();
+    private static int splitFrame;
 
     private BedrockInputReplay() {
     }
@@ -131,8 +139,12 @@ public final class BedrockInputReplay {
             ViaFabricPlusBedrock.impl().logger().info("[replay] died at frame {}", frameIndex);
             state = State.DONE;
         }
+        if (state == State.PLAYING && frameIndex > 0 && frameIndex <= POSITIONS.size()) {
+            checkSplit(minecraft.player);
+        }
         if (state == State.TELEPORTING && --waitTicks <= 0) {
             frameIndex = 0;
+            splitFrame = -1;
             state = State.PLAYING;
             if (startVelocity != null) {
                 minecraft.player.setDeltaMovement(startVelocity[0], startVelocity[1], startVelocity[2]);
@@ -155,6 +167,13 @@ public final class BedrockInputReplay {
                 startSprinting = startJson.has("sprinting") && startJson.get("sprinting").getAsBoolean();
             }
             FRAMES.clear();
+            POSITIONS.clear();
+            if (json.has("positions")) {
+                for (final JsonElement element : json.getAsJsonArray("positions")) {
+                    final JsonArray position = element.getAsJsonArray();
+                    POSITIONS.add(new double[]{position.get(0).getAsDouble(), position.get(1).getAsDouble(), position.get(2).getAsDouble()});
+                }
+            }
             for (final JsonElement element : json.getAsJsonArray("frames")) {
                 final JsonArray frame = element.getAsJsonArray();
                 final String keys = frame.get(2).getAsString();
@@ -195,6 +214,28 @@ public final class BedrockInputReplay {
         player.setYHeadRot(frame.yaw);
         input.keyPresses = frame.keys;
         return new Vec2(impulse(frame.keys.left(), frame.keys.right()), impulse(frame.keys.forward(), frame.keys.backward())).normalized();
+    }
+
+    /**
+     * Called after the player moved for a frame, compares its position with the one the Bedrock player had.
+     */
+    private static void checkSplit(final LocalPlayer player) {
+        final int frame = frameIndex - 1;
+        if (STOP_AFTER_SPLIT < 0) {
+            return;
+        }
+        if (splitFrame < 0) {
+            final double[] position = POSITIONS.get(frame);
+            final double distance = Math.sqrt(Math.pow(player.getX() - position[0], 2) + Math.pow(player.getY() + EYE_HEIGHT - position[1], 2)
+                + Math.pow(player.getZ() - position[2], 2));
+            if (distance > SPLIT_DISTANCE) {
+                splitFrame = frame;
+                ViaFabricPlusBedrock.impl().logger().info("[replay] split at frame {}, off by {}", frame, distance);
+            }
+        } else if (frame >= splitFrame + STOP_AFTER_SPLIT) {
+            ViaFabricPlusBedrock.impl().logger().info("[replay] stopped {} frames after the split", STOP_AFTER_SPLIT);
+            state = State.DONE;
+        }
     }
 
     private static float impulse(final boolean positive, final boolean negative) {
