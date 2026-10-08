@@ -25,6 +25,8 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.ViaFabricPlusImpl;
+import com.viaversion.viafabricplus.api.settings.impl.Orientation;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.injection.access.IServerAddress;
 import com.viaversion.viafabricplus.bedrock.screen.BedrockAccountsScreen;
@@ -69,12 +71,22 @@ public abstract class MixinJoinMultiplayerScreen extends Screen {
         this.viaFabricPlusBedrock$placeAccountsButton(ci);
     }
 
-    // Across from the ViaFabricPlus button, which is in the top left corner by default
+    // Next to the ViaFabricPlus button, in whichever corner the settings put it
     @Inject(method = "repositionElements", at = @At("RETURN"))
     private void viaFabricPlusBedrock$placeAccountsButton(final CallbackInfo ci) {
-        if (this.viaFabricPlusBedrock$accountsButton != null) {
-            this.viaFabricPlusBedrock$accountsButton.setPosition(this.width - 98 - 5, 5);
+        final Button button = this.viaFabricPlusBedrock$accountsButton;
+        if (button == null) {
+            return;
         }
+        final Orientation orientation = ViaFabricPlusImpl.impl().options().multiplayerScreenButtonOrientation().value();
+        if (orientation == Orientation.NONE) {
+            Orientation.RIGHT_TOP.getPositioner().setPosition(button, this.width, this.height);
+            return;
+        }
+        final Button viaFabricPlusButton = Button.builder(Component.empty(), _ -> {}).size(button.getWidth(), button.getHeight()).build();
+        orientation.getPositioner().setPosition(viaFabricPlusButton, this.width, this.height);
+        final int x = viaFabricPlusButton.getX() < this.width / 2 ? viaFabricPlusButton.getRight() + 4 : viaFabricPlusButton.getX() - button.getWidth() - 4;
+        button.setPosition(x, viaFabricPlusButton.getY());
     }
 
     @WrapOperation(method = "join(Lnet/minecraft/client/multiplayer/ServerData;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/multiplayer/resolver/ServerAddress;parseString(Ljava/lang/String;)Lnet/minecraft/client/multiplayer/resolver/ServerAddress;"))
