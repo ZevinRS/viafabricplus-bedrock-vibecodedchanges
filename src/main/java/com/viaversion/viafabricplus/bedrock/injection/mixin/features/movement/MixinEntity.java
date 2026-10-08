@@ -43,6 +43,8 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
@@ -94,6 +96,15 @@ public abstract class MixinEntity {
             final Entity entity = (Entity) (Object) this;
             cir.setReturnValue(BlockPos.containing(entity.getX(), entity.getY() - 0.500001, entity.getZ()));
         }
+    }
+
+    /**
+     * Soul sand doesn't scale the velocity on Bedrock, it only slows the player down by its higher ground friction, see
+     * {@link com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement.MixinLivingEntity}.
+     */
+    @WrapOperation(method = "getBlockSpeedFactor", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/block/Block;getSpeedFactor()F"))
+    private float noSoulSandSpeedFactor(final Block block, final Operation<Float> original) {
+        return block == Blocks.SOUL_SAND && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) ? 1F : original.call(block);
     }
 
     @Unique

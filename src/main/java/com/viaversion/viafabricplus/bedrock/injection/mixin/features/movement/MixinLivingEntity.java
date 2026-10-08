@@ -34,6 +34,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.jetbrains.annotations.Nullable;
@@ -42,6 +43,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -80,6 +82,21 @@ public abstract class MixinLivingEntity {
     @Redirect(method = "getFluidFallingAdjustedMovement", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;isSprinting()Z"))
     private boolean changeFluidGravityCondition(final LivingEntity instance) {
         return ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) ? instance.isSwimming() : instance.isSprinting();
+    }
+
+    /**
+     * Bedrock accelerates the player on soul sand as if its friction was 1.225 times higher, which slows the player down
+     * there instead of Java's speed factor (GroundTravelTypeSystemImpl::_calcGroundFrictionV2). The friction slowing the
+     * velocity down after the move stays the normal one.
+     */
+    @ModifyArg(method = "handleRelativeFrictionAndCalculateMovement", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;getFrictionInfluencedSpeed(F)F"))
+    private float soulSandFriction(final float friction) {
+        final LivingEntity entity = (LivingEntity) (Object) this;
+        if (entity.onGround() && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)
+            && entity.level().getBlockState(entity.getBlockPosBelowThatAffectsMyMovement()).is(Blocks.SOUL_SAND)) {
+            return friction * 1.225F;
+        }
+        return friction;
     }
 
     // Bedrock slows the player in lava the same way however deep it is, as recorded when swimming up out of lava
