@@ -22,20 +22,22 @@
 package com.viaversion.viafabricplus.bedrock.screen;
 
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
-import com.viaversion.viafabricplus.bedrock.account.BedrockAccount;
 import com.viaversion.viafabricplus.bedrock.account.PrivateBrowser;
 import com.viaversion.viafabricplus.screen.base.VFPScreen;
+import java.io.IOException;
 import java.security.SecureRandom;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Util;
 import net.raphimc.minecraftauth.bedrock.BedrockAuthManager;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Walks through making a new Microsoft account to test with. Microsoft only allows people to create accounts, so the
- * steps open its own pages to fill out in a private browser window, and the new account is logged in to at the end.
+ * Walks through making a new Microsoft account to test with. Microsoft only allows people to create accounts, so it's
+ * made in the Xbox app, which asks for fewer verifications than the website and sets up the gamertag too. The new
+ * account is logged in to in a private browser window at the end. Without the Xbox app, Outlook's sign-up is opened.
  */
 public final class BedrockCreateAccountScreen extends VFPScreen {
 
@@ -43,6 +45,7 @@ public final class BedrockCreateAccountScreen extends VFPScreen {
 
     // Outlook's "Create free account", which makes a new @outlook.com address instead of asking for an existing one
     private static final String SIGN_UP = "https://go.microsoft.com/fwlink/p/?linkid=2125440";
+    private static final boolean XBOX_APP = Util.getPlatform() == Util.OS.WINDOWS;
     private static final String ADDRESS_CHARACTERS = "abcdefghijkmnopqrstuvwxyz23456789";
     private static final int ADDRESS_LENGTH = 14;
     private static final String PASSWORD_CHARACTERS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!#$%&*+-=?@";
@@ -66,16 +69,19 @@ public final class BedrockCreateAccountScreen extends VFPScreen {
     @Override
     protected void init() {
         final int left = this.width / 2 - 150;
-        this.addRenderableWidget(Button.builder(Component.translatable("bedrock_create_account.viafabricplus.open_sign_up"), _ -> open(SIGN_UP))
+        this.addRenderableWidget(Button.builder(Component.translatable(XBOX_APP ? "bedrock_create_account.viafabricplus.open_xbox_app"
+                : "bedrock_create_account.viafabricplus.open_sign_up"), _ -> openSignUp())
             .pos(left, this.stepTop(0) + 26).size(BUTTON_WIDTH, 20).build());
         this.addRenderableWidget(Button.builder(Component.translatable("bedrock_create_account.viafabricplus.copy_address"), _ -> this.copyAddress())
             .pos(left + BUTTON_WIDTH + BUTTON_GAP, this.stepTop(0) + 26).size(BUTTON_WIDTH, 20).build());
         this.addRenderableWidget(Button.builder(Component.translatable("bedrock_create_account.viafabricplus.copy_password"), _ -> this.copyPassword())
             .pos(left + (BUTTON_WIDTH + BUTTON_GAP) * 2, this.stepTop(0) + 26).size(BUTTON_WIDTH, 20).build());
-        this.addRenderableWidget(Button.builder(Component.translatable("bedrock_create_account.viafabricplus.open_xbox"), _ -> open(BedrockAccount.XBOX_SIGN_IN))
-            .pos(left, this.stepTop(1) + 26).size(BUTTON_WIDTH, 20).build());
         this.addRenderableWidget(Button.builder(Component.translatable("bedrock_create_account.viafabricplus.log_in"), _ -> this.logIn())
-            .pos(left, this.stepTop(2) + 26).size(BUTTON_WIDTH, 20).build());
+            .pos(left, this.stepTop(1) + 26).size(BUTTON_WIDTH, 20).build());
+        if (XBOX_APP) {
+            this.addRenderableWidget(Button.builder(Component.translatable("bedrock_create_account.viafabricplus.open_xbox_app"), _ -> openXboxApp())
+                .pos(left, this.stepTop(2) + 26).size(BUTTON_WIDTH, 20).build());
+        }
         super.init();
     }
 
@@ -99,10 +105,12 @@ public final class BedrockCreateAccountScreen extends VFPScreen {
     public void extractRenderState(final GuiGraphicsExtractor graphics, final int mouseX, final int mouseY, final float delta) {
         super.extractRenderState(graphics, mouseX, mouseY, delta);
         final int left = this.width / 2 - 150;
-        for (int step = 0; step < 3; step++) {
+        // Switching the Xbox app back is only needed when the account was made in it
+        for (int step = 0; step < (XBOX_APP ? 3 : 2); step++) {
             final int top = this.stepTop(step);
-            graphics.text(this.font, Component.translatable("bedrock_create_account.viafabricplus.step" + step), left, top, ACCENT_COLOR);
-            graphics.text(this.font, Component.translatable("bedrock_create_account.viafabricplus.step" + step + ".detail"), left, top + 12, SECONDARY_COLOR);
+            final String key = "bedrock_create_account.viafabricplus.step" + step + (step == 0 && !XBOX_APP ? ".web" : "");
+            graphics.text(this.font, Component.translatable(key), left, top, ACCENT_COLOR);
+            graphics.text(this.font, Component.translatable(key + ".detail"), left, top + 12, SECONDARY_COLOR);
         }
         if (this.address != null) {
             graphics.text(this.font, this.address + "@outlook.com", left, this.stepTop(0) + 50, -1);
@@ -116,13 +124,26 @@ public final class BedrockCreateAccountScreen extends VFPScreen {
         return 34 + step * STEP_HEIGHT;
     }
 
-    private static void open(final String url) {
-        PrivateBrowser.open(url);
+    private static void openSignUp() {
+        if (XBOX_APP) {
+            openXboxApp();
+        } else {
+            PrivateBrowser.open(SIGN_UP);
+        }
+    }
+
+    private static void openXboxApp() {
+        try {
+            new ProcessBuilder("cmd", "/c", "start", "", "msgamingapp:").start();
+        } catch (final IOException e) {
+            ViaFabricPlusBedrock.impl().logger().error("Failed to open the Xbox app", e);
+            VFPScreen.showToast(Component.translatable("bedrock_create_account.viafabricplus.no_xbox_app"));
+        }
     }
 
     /**
-     * Copies a random name for the new address, which the sign-up page completes with @outlook.com. Names have to
-     * start with a letter.
+     * Copies a random name for a new address, which the sign-up completes with @outlook.com. Names have to start with
+     * a letter.
      */
     private void copyAddress() {
         this.address = (char) ('a' + this.random.nextInt(26)) + this.randomString(ADDRESS_CHARACTERS, ADDRESS_LENGTH - 1);
