@@ -25,8 +25,10 @@ import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.api.settings.base.BooleanSetting;
 import com.viaversion.viafabricplus.api.settings.base.SettingGroup;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
+import com.viaversion.viafabricplus.bedrock.screen.BedrockAccountsScreen;
 import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
 import java.util.Objects;
+import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import net.raphimc.viabedrock.protocol.data.ProtocolConstants;
@@ -38,7 +40,7 @@ public final class BedrockSettings {
 
     public BedrockSettings() {
         final SettingGroup group = ViaFabricPlus.api().settings().register("bedrock");
-        group.register("account", new ActionSetting(Component.translatable("bedrock_settings.viafabricplus.account"), BedrockSettings::accountName, () -> ViaFabricPlusBedrock.impl().account().login()));
+        group.register("account", new ActionSetting(Component.translatable("bedrock_settings.viafabricplus.account"), BedrockSettings::accountName, () -> new BedrockAccountsScreen().open(Minecraft.getInstance().gui.screen())));
         this.replaceDefaultPort = group.registerBoolean("replace_default_port", true);
         this.recordPackets = group.registerBoolean("record_packets", false);
     }

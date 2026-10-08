@@ -5,7 +5,7 @@
 
   "bedrock_settings.viafabricplus": "Bedrock",
   "bedrock_settings.viafabricplus.account": "Account for Bedrock Edition",
-  "bedrock_settings.viafabricplus.account.login": "Click to log in",
+  "bedrock_settings.viafabricplus.account.login": "Click to add one",
   "bedrock_settings.viafabricplus.replace_default_port": "Replace default port in server list",
   "bedrock_settings.viafabricplus.record_packets": "Record packets to bedrock-captures",
 
@@ -13,9 +13,21 @@
 
   "screen.viafabricplus.bedrock_realms": "Bedrock Realms",
   "screen.viafabricplus.bedrock_friends": "Bedrock Friends",
+  "screen.viafabricplus.bedrock_accounts": "Bedrock Accounts",
+  "bedrock_accounts.viafabricplus.use": "Use",
+  "bedrock_accounts.viafabricplus.add": "Add account",
+  "bedrock_accounts.viafabricplus.remove": "Remove",
+  "bedrock_accounts.viafabricplus.remove_confirm": "Remove %s?",
+  "bedrock_accounts.viafabricplus.remove_notice": "You'll have to log in again to use this account.",
+  "bedrock_accounts.viafabricplus.switched": "Now playing as %s",
+  "bedrock_accounts.viafabricplus.in_use": "In use",
+  "bedrock_accounts.viafabricplus.unknown": "Unknown account",
+  "bedrock_accounts.viafabricplus.empty": "No accounts yet. Add one to play on Bedrock servers.",
+  "bedrock_accounts.viafabricplus.current": "Playing as %s",
+  "bedrock_accounts.viafabricplus.none": "No Bedrock account",
   "screen.viafabricplus.accept_invite": "Accept an invitation code",
 
-  "bedrock_realms.viafabricplus.warning": "This feature requires a Bedrock Edition account to be set in the settings!",
+  "bedrock_realms.viafabricplus.warning": "Add a Bedrock account in Bedrock Accounts first.",
   "bedrock_realms.viafabricplus.availability_check": "Checking availability...",
   "bedrock_realms.viafabricplus.no_worlds": "No worlds found :(",
   "bedrock_realms.viafabricplus.unavailable": "Your ViaFabricPlus is outdated and not compatible with Minecraft Realms.",

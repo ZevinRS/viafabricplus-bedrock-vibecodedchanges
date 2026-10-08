@@ -22,6 +22,7 @@
 package com.viaversion.viafabricplus.bedrock.injection.mixin.core.integration;
 
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
+import com.viaversion.viafabricplus.bedrock.screen.BedrockAccountsScreen;
 import com.viaversion.viafabricplus.bedrock.screen.BedrockFriendsScreen;
 import com.viaversion.viafabricplus.bedrock.screen.BedrockRealmsScreen;
 import com.viaversion.viafabricplus.screen.base.VFPScreen;
@@ -61,9 +62,12 @@ public abstract class MixinVFPScreen {
         realms.active = !missingAccount && Minecraft.getInstance().getConnection() == null;
         friends.active = !missingAccount;
 
-        final Button[] result = Arrays.copyOf(buttons, buttons.length + 2);
+        final Button accounts = Button.builder(BedrockAccountsScreen.TITLE, _ -> new BedrockAccountsScreen().open((Screen) (Object) this)).build();
+
+        final Button[] result = Arrays.copyOf(buttons, buttons.length + 3);
         result[buttons.length] = realms;
         result[buttons.length + 1] = friends;
+        result[buttons.length + 2] = accounts;
         return result;
     }
 

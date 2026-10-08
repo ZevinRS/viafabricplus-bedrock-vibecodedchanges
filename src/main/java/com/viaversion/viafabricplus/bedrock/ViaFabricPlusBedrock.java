@@ -50,7 +50,7 @@ public final class ViaFabricPlusBedrock implements ViaFabricPlusEntrypoint {
     @Override
     public void onPreSettingsLoading() {
         this.settings = new BedrockSettings();
-        this.account = new BedrockAccount(ViaFabricPlus.api().path().resolve("bedrock.json"));
+        this.account = new BedrockAccount(ViaFabricPlus.api().path().resolve("bedrock_accounts.json"), ViaFabricPlus.api().path().resolve("bedrock.json"));
     }
 
     @Override

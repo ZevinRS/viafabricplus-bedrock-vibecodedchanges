@@ -21,6 +21,8 @@
 
 package com.viaversion.viafabricplus.bedrock.account;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.blaze3d.Blaze3D;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
@@ -30,7 +32,11 @@ import com.viaversion.viafabricplus.bedrock.screen.BedrockRealmsScreen;
 import com.viaversion.viafabricplus.screen.base.VFPScreen;
 import com.viaversion.viafabricplus.util.JsonSave;
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConfirmScreen;
@@ -44,44 +50,122 @@ import net.raphimc.minecraftauth.util.holder.listener.ChangeListener;
 import net.raphimc.viabedrock.protocol.data.ProtocolConstants;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * The Bedrock accounts the player logged in to, one of which is used to join servers.
+ */
 public final class BedrockAccount {
 
     private static final Component TITLE = Component.nullToEmpty("Microsoft Bedrock login");
 
     private final Path path;
-    private BedrockAuthManager account;
+    private final List<BedrockAuthManager> accounts = new CopyOnWriteArrayList<>();
+    private volatile @Nullable BedrockAuthManager selected;
     private Thread thread;
 
-    public BedrockAccount(final Path path) {
+    /**
+     * @param legacyPath the single account older versions saved, imported once
+     */
+    public BedrockAccount(final Path path, final Path legacyPath) {
         this.path = path;
         JsonSave.load(path, object -> {
-            this.account = BedrockAuthManager.fromJson(MinecraftAuth.createHttpClient(), ProtocolConstants.BEDROCK_VERSION_NAME, object);
-            this.account.getChangeListeners().add(this::save);
+            for (final JsonElement element : object.getAsJsonArray("accounts")) {
+                this.accounts.add(this.load(element.getAsJsonObject()));
+            }
+            final int selected = object.has("selected") ? object.get("selected").getAsInt() : 0;
+            this.selected = selected >= 0 && selected < this.accounts.size() ? this.accounts.get(selected) : null;
         }, this::serialize);
+        if (!Files.exists(path) && Files.exists(legacyPath)) {
+            JsonSave.read(legacyPath, object -> {
+                this.selected = this.load(object);
+                this.accounts.add(this.selected);
+            });
+            this.save();
+        }
     }
 
-    private @Nullable JsonObject serialize() {
-        return this.account == null ? null : BedrockAuthManager.toJson(this.account);
+    private BedrockAuthManager load(final JsonObject object) {
+        final BedrockAuthManager account = BedrockAuthManager.fromJson(MinecraftAuth.createHttpClient(), ProtocolConstants.BEDROCK_VERSION_NAME, object);
+        account.getChangeListeners().add(this::save);
+        return account;
+    }
+
+    private JsonObject serialize() {
+        final JsonObject object = new JsonObject();
+        final JsonArray accounts = new JsonArray();
+        this.accounts.forEach(account -> accounts.add(BedrockAuthManager.toJson(account)));
+        object.add("accounts", accounts);
+        object.addProperty("selected", this.accounts.indexOf(this.selected));
+        return object;
     }
 
     /**
-     * Writes the account right away instead of only in the shutdown hook, so the login and refreshed tokens
+     * Writes the accounts right away instead of only in the shutdown hook, so logins and refreshed tokens
      * aren't lost when the game is killed or crashes.
      */
     private synchronized void save() {
         JsonSave.write(this.path, this::serialize);
     }
 
+    /**
+     * @return the account used to join servers
+     */
     public @Nullable BedrockAuthManager get() {
-        return this.account;
+        return this.selected;
+    }
+
+    public List<BedrockAuthManager> accounts() {
+        return Collections.unmodifiableList(this.accounts);
+    }
+
+    public synchronized void select(final BedrockAuthManager account) {
+        if (this.selected != account && this.accounts.contains(account)) {
+            this.selected = account;
+            this.save();
+            switched();
+        }
+    }
+
+    public synchronized void remove(final BedrockAuthManager account) {
+        this.accounts.remove(account);
+        if (this.selected == account) {
+            this.selected = this.accounts.isEmpty() ? null : this.accounts.getFirst();
+            switched();
+        }
+        this.save();
     }
 
     public @Nullable String displayName() {
-        if (this.account != null && this.account.getMinecraftMultiplayerToken().hasValue()) {
-            return this.account.getMinecraftMultiplayerToken().getCached().getDisplayName();
+        return this.selected != null ? displayName(this.selected) : null;
+    }
+
+    public static @Nullable String displayName(final BedrockAuthManager account) {
+        return account.getMinecraftMultiplayerToken().hasValue() ? account.getMinecraftMultiplayerToken().getCached().getDisplayName() : null;
+    }
+
+    private static @Nullable String xuid(final BedrockAuthManager account) {
+        return account.getMinecraftMultiplayerToken().hasValue() ? account.getMinecraftMultiplayerToken().getCached().getXuid() : null;
+    }
+
+    private static void switched() {
+        BedrockFriendsService.leaveCurrent();
+        BedrockRealmsScreen.invalidate(); // The realms of the previous account no longer apply
+    }
+
+    /**
+     * Saves a new login and uses it. Logging in to an account again replaces its saved login.
+     */
+    private synchronized void add(final BedrockAuthManager account) {
+        final String xuid = xuid(account);
+        final int existing = xuid == null ? -1 : this.accounts.stream().map(BedrockAccount::xuid).toList().indexOf(xuid);
+        if (existing >= 0) {
+            this.accounts.set(existing, account);
         } else {
-            return null;
+            this.accounts.add(account);
         }
+        account.getChangeListeners().add(this::save);
+        this.selected = account;
+        this.save();
+        switched();
     }
 
     public void login() {
@@ -114,11 +198,7 @@ public final class BedrockAccount {
             });
             account.getMinecraftMultiplayerToken().refreshIfExpired();
             account.getMinecraftCertificateChain().refreshIfExpired();
-            this.account = account;
-            account.getChangeListeners().add(this::save);
-            this.save();
-            BedrockFriendsService.leaveCurrent();
-            BedrockRealmsScreen.invalidate(); // The realms of the previous account no longer apply
+            this.add(account);
 
             VFPScreen.setScreen(prevScreen);
         } catch (final Exception e) {
