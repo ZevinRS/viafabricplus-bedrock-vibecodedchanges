@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.building;
 
+import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -60,6 +61,9 @@ public final class BedrockPacketDelay {
         }
         // Applied at the end of the tick that sends the input before the move it is used for
         PENDING.add(new Pending<>(packet, handler, sentTicks + moves - 1));
+        if (BedrockInputReplay.isPlaying()) {
+            ViaFabricPlusBedrock.impl().logger().info("[replay-packet] held {} after frame {} t={}", packet.getClass().getSimpleName(), BedrockInputReplay.frameIndex() - 1, System.currentTimeMillis());
+        }
         return true;
     }
 
@@ -78,14 +82,15 @@ public final class BedrockPacketDelay {
             PENDING.clear();
             return;
         }
-        // Packets are applied in the order they arrived, so one is only due when all before it are
+        // Each kind of update has its own delay, so a later packet can be due before an earlier one
         final List<Pending<?>> due = new ArrayList<>();
-        while (!PENDING.isEmpty() && PENDING.peek().dueTick <= sentTicks) {
-            due.add(PENDING.poll());
-        }
+        PENDING.removeIf(pending -> pending.dueTick <= sentTicks && due.add(pending));
         applying = true;
         try {
             for (final Pending<?> pending : due) {
+                if (BedrockInputReplay.isPlaying()) {
+                    ViaFabricPlusBedrock.impl().logger().info("[replay-packet] applied {} after frame {}", pending.packet().getClass().getSimpleName(), BedrockInputReplay.frameIndex() - 1);
+                }
                 pending.apply(connection);
             }
         } finally {

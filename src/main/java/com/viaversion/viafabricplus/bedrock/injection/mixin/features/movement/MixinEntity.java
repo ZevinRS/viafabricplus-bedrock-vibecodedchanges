@@ -113,6 +113,20 @@ public abstract class MixinEntity {
     }
 
     /**
+     * Java turns the input into a direction with a sine table, which is off by up to 1E-4. Bedrock computes the sine
+     * and cosine of the yaw exactly (Actor::_moveRelative), and the difference adds up over a few hundred ticks.
+     */
+    @WrapOperation(method = "getInputVector", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/Mth;sin(D)F"))
+    private static float exactInputSin(final double angle, final Operation<Float> original) {
+        return ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) ? (float) Math.sin((float) angle) : original.call(angle);
+    }
+
+    @WrapOperation(method = "getInputVector", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/Mth;cos(D)F"))
+    private static float exactInputCos(final double angle, final Operation<Float> original) {
+        return ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) ? (float) Math.cos((float) angle) : original.call(angle);
+    }
+
+    /**
      * Java only finds the ground when the player moves down onto it, so a velocity without a downward part, like one the
      * server set, makes a player standing on the ground count as in the air for that move. Bedrock keeps it on the
      * ground, as recorded in a cobweb where the server kept setting the velocity. A tiny downward move finds the ground.
