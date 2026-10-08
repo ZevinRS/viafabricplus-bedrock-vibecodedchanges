@@ -22,10 +22,13 @@
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 
 import com.google.common.collect.ImmutableList;
+import com.llamalad7.mixinextras.expression.Definition;
+import com.llamalad7.mixinextras.expression.Expression;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.sugar.Local;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.building.BedrockInputReplay;
@@ -84,6 +87,17 @@ public abstract class MixinEntity {
         } else {
             this.stuckSpeedMultiplier = value;
         }
+    }
+
+    /**
+     * Java skips moves shorter than about 0.0003 that weren't stopped by a collision. Bedrock moves however little the
+     * movement is, as recorded when the player slides to a stop.
+     */
+    @Definition(id = "movementLength", local = @Local(type = double.class, name = "movementLength"))
+    @Expression("movementLength > ?")
+    @ModifyExpressionValue(method = "move", at = @At("MIXINEXTRAS:EXPRESSION"))
+    private boolean moveAnyDistance(final boolean original, @Local(name = "movementLength") final double movementLength) {
+        return original || movementLength > 0 && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST);
     }
 
     // Bedrock ignores the box a vehicle would apply to its passengers

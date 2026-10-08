@@ -49,6 +49,12 @@ public abstract class MixinLocalPlayer {
         return this.isSprintingPossible(allowedInShallowWater || ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) && (instance.isSwimming() || instance.onGround()));
     }
 
+    // Pressing back doesn't cancel a double tap of forward to sprint on Bedrock, as recorded with forward and back held for a tick
+    @ModifyExpressionValue(method = "aiStep", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Input;backward()Z"))
+    private boolean keepSprintDoubleTap(final boolean backward) {
+        return !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) && backward;
+    }
+
     /**
      * Java only starts swimming at the start of the tick, so sprinting off in water swims from the next tick on. Bedrock
      * swims in the tick the sprint started, as recorded when sprinting off underwater.
