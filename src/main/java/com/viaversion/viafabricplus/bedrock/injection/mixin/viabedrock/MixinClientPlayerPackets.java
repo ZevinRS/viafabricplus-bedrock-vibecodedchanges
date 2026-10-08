@@ -23,14 +23,17 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.viaversion.viafabricplus.bedrock.building.BedrockAuthInput;
 import com.viaversion.viafabricplus.bedrock.building.BedrockItemUse;
 import java.util.Set;
 import net.raphimc.viabedrock.api.util.MathUtil;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.PlayerAuthInputData;
 import net.raphimc.viabedrock.protocol.model.Position2f;
+import net.raphimc.viabedrock.protocol.model.Position3f;
 import net.raphimc.viabedrock.protocol.packet.ClientPlayerPackets;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
 @Mixin(value = ClientPlayerPackets.class, remap = false)
 public abstract class MixinClientPlayerPackets {
@@ -46,6 +49,27 @@ public abstract class MixinClientPlayerPackets {
             return moveVector;
         }
         return new Position2f(moveVector.x() * BedrockItemUse.ITEM_USE_SPEED_MULTIPLIER, moveVector.y() * BedrockItemUse.ITEM_USE_SPEED_MULTIPLIER);
+    }
+
+    /**
+     * Sends the player's real velocity as delta instead of ViaBedrock's estimate, which got water, lava, climbing and
+     * other blocks wrong and was 2% off on ground and in air, as compared with the Bedrock client. The delta is the only
+     * load of the sixth local in the player_auth_input handler.
+     */
+    @ModifyVariable(method = "lambda$register$18", at = @At(value = "LOAD", ordinal = 0), index = 6)
+    private static Position3f sendRealVelocity(final Position3f estimated) {
+        final Position3f velocity = BedrockAuthInput.velocity();
+        return velocity != null ? velocity : estimated;
+    }
+
+    /**
+     * Bedrock sends the yaw of its interact rotation from -270 to 90 degrees instead of -180 to 180, as recorded from the
+     * Bedrock client. It's the third yaw read in the player_auth_input handler.
+     */
+    @WrapOperation(method = "lambda$register$18", at = @At(value = "INVOKE", target = "Lnet/raphimc/viabedrock/protocol/model/Position3f;y()F", ordinal = 2))
+    private static float bedrockInteractYaw(final Position3f rotation, final Operation<Float> original) {
+        final float yaw = original.call(rotation);
+        return ((yaw + 270F) % 360F + 360F) % 360F - 270F;
     }
 
 }

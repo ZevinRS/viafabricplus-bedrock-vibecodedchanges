@@ -26,6 +26,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.building.BedrockSprint;
+import com.viaversion.viafabricplus.bedrock.building.BedrockAuthInput;
 import com.viaversion.viafabricplus.bedrock.building.BedrockItemUse;
 import net.minecraft.client.player.LocalPlayer;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
@@ -70,7 +71,8 @@ public abstract class MixinLocalPlayer {
     }
 
     @Inject(method = "sendPosition", at = @At("HEAD"))
-    private void sendSprintStartAndStop(final CallbackInfo ci) {
+    private void prepareAuthInput(final CallbackInfo ci) {
+        BedrockAuthInput.setVelocity(((LocalPlayer) (Object) this).getDeltaMovement());
         final UserConnection connection = ViaFabricPlus.api().userConnection();
         if (connection == null || !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
             return;
