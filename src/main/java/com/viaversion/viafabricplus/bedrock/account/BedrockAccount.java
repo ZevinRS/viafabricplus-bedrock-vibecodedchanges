@@ -26,9 +26,9 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.blaze3d.Blaze3D;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
-import com.viaversion.viafabricplus.bedrock.injection.access.IConfirmScreen;
 import com.viaversion.viafabricplus.bedrock.friends.BedrockFriendsService;
 import com.viaversion.viafabricplus.bedrock.screen.BedrockRealmsScreen;
+import com.viaversion.viafabricplus.bedrock.screen.BedrockSignInScreen;
 import com.viaversion.viafabricplus.screen.base.VFPScreen;
 import com.viaversion.viafabricplus.util.JsonSave;
 import java.net.URI;
@@ -36,16 +36,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.Consumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.raphimc.minecraftauth.MinecraftAuth;
 import net.raphimc.minecraftauth.bedrock.BedrockAuthManager;
-import net.raphimc.minecraftauth.msa.model.MsaDeviceCode;
-import net.raphimc.minecraftauth.msa.service.impl.DeviceCodeMsaAuthService;
 import net.raphimc.minecraftauth.util.holder.listener.ChangeListener;
 import net.raphimc.minecraftauth.xbl.exception.XblRequestException;
 import net.raphimc.viabedrock.protocol.data.ProtocolConstants;
@@ -56,7 +54,6 @@ import org.jetbrains.annotations.Nullable;
  */
 public final class BedrockAccount {
 
-    private static final Component TITLE = Component.nullToEmpty("Microsoft Bedrock login");
     // Signing in to Xbox with a new account asks for a gamertag and creates its Xbox profile
     public static final String XBOX_SIGN_IN = "https://www.xbox.com/en-US/auth/msa?action=logIn&returnUrl=https%3A%2F%2Fwww.xbox.com%2Fen-US%2F";
 
@@ -189,16 +186,13 @@ public final class BedrockAccount {
         try {
             final BedrockAuthManager account = BedrockAuthManager
                 .create(MinecraftAuth.createHttpClient(), ProtocolConstants.BEDROCK_VERSION_NAME)
-                .login(DeviceCodeMsaAuthService::new, (Consumer<MsaDeviceCode>) deviceCode -> {
-                    VFPScreen.setScreen(new ConfirmScreen(copyUrl -> {
-                        if (copyUrl) {
-                            client.keyboardHandler.setClipboard(deviceCode.getDirectVerificationUri());
-                        } else {
-                            client.gui.setScreen(prevScreen);
-                            this.thread.interrupt();
-                        }
-                    }, TITLE, Component.translatable("bedrock_account.viafabricplus.notice"), Component.translatable("base.viafabricplus.copy_link"), Component.translatable("base.viafabricplus.cancel")));
-                    openPage(deviceCode.getDirectVerificationUri(), privateWindow);
+                .login((httpClient, config) -> {
+                    final BrowserCodeMsaAuthService[] service = new BrowserCodeMsaAuthService[1];
+                    service[0] = new BrowserCodeMsaAuthService(httpClient, config, address -> {
+                        client.execute(() -> new BedrockSignInScreen(service[0], address).open(prevScreen));
+                        openPage(address, privateWindow);
+                    });
+                    return service[0];
                 });
             account.getChangeListeners().add(new ChangeListener() {
                 @Override
@@ -212,8 +206,8 @@ public final class BedrockAccount {
 
             VFPScreen.setScreen(prevScreen);
         } catch (final Exception e) {
-            if (e instanceof InterruptedException) {
-                return;
+            if (e instanceof InterruptedException || e instanceof CancellationException) {
+                return; // The player closed the sign-in
             }
 
             this.thread.interrupt();
@@ -281,8 +275,8 @@ public final class BedrockAccount {
         }
 
         Minecraft.getInstance().execute(() -> {
-            if (Minecraft.getInstance().gui.screen() instanceof ConfirmScreen confirmScreen) {
-                ((IConfirmScreen) confirmScreen).viaFabricPlusBedrock$updateMessage(Component.translatable("minecraftauth_library.viafabricplus." + step));
+            if (Minecraft.getInstance().gui.screen() instanceof BedrockSignInScreen signInScreen) {
+                signInScreen.setStatus(Component.translatable("minecraftauth_library.viafabricplus." + step));
             }
         });
     }

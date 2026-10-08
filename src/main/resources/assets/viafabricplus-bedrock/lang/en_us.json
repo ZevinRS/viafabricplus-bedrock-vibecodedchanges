@@ -9,11 +9,15 @@
   "bedrock_settings.viafabricplus.replace_default_port": "Replace default port in server list",
   "bedrock_settings.viafabricplus.record_packets": "Record packets to bedrock-captures",
 
-  "bedrock_account.viafabricplus.notice": "Your browser should have opened.\nClosing this screen will cancel the process!",
 
   "screen.viafabricplus.bedrock_realms": "Bedrock Realms",
   "screen.viafabricplus.bedrock_friends": "Bedrock Friends",
   "screen.viafabricplus.bedrock_accounts": "Bedrock Accounts",
+  "screen.viafabricplus.bedrock_sign_in": "Microsoft Sign-in",
+  "bedrock_sign_in.viafabricplus.browser": "Sign in in the browser window that opened.",
+  "bedrock_sign_in.viafabricplus.copy_address": "When the page goes blank, copy its address (Ctrl+L, then Ctrl+C).",
+  "bedrock_sign_in.viafabricplus.paste": "Or paste the address here",
+  "bedrock_sign_in.viafabricplus.signing_in": "Signing in...",
   "bedrock_accounts.viafabricplus.use": "Use",
   "bedrock_accounts.viafabricplus.add": "Add account",
   "bedrock_accounts.viafabricplus.remove": "Remove",
