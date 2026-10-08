@@ -69,6 +69,8 @@ public abstract class MixinConnection_1 {
         config.setOption(RakChannelOption.RAK_CONNECT_TIMEOUT, config.getOption(ChannelOption.CONNECT_TIMEOUT_MILLIS).longValue());
         config.setOption(RakChannelOption.RAK_SESSION_TIMEOUT, 30_000L);
         config.setOption(RakChannelOption.RAK_GUID, ThreadLocalRandom.current().nextLong());
+        // Send every packet when it is written, like the Bedrock client, instead of on the next 10 ms RakNet tick
+        config.setOption(RakChannelOption.RAK_AUTO_FLUSH, false);
 
         // NetherNet config
         config.setOption(NetherChannelOption.NETHER_CLIENT_HANDSHAKE_TIMEOUT_MS, config.getOption(ChannelOption.CONNECT_TIMEOUT_MILLIS));
