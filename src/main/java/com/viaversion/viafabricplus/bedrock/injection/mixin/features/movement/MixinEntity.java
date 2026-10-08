@@ -34,12 +34,15 @@ import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.building.BedrockInputReplay;
 import com.viaversion.viafabricplus.bedrock.building.BedrockSprint;
 import com.viaversion.viaversion.api.connection.UserConnection;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.InsideBlockEffectApplier;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -52,11 +55,13 @@ import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.PlayerAuthIn
 import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.Opcodes;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -105,6 +110,50 @@ public abstract class MixinEntity {
     @WrapOperation(method = "getBlockSpeedFactor", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/block/Block;getSpeedFactor()F"))
     private float noSoulSandSpeedFactor(final Block block, final Operation<Float> original) {
         return block == Blocks.SOUL_SAND && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) ? 1F : original.call(block);
+    }
+
+    /**
+     * Java only finds the ground when the player moves down onto it, so a velocity without a downward part, like one the
+     * server set, makes a player standing on the ground count as in the air for that move. Bedrock keeps it on the
+     * ground, as recorded in a cobweb where the server kept setting the velocity. A tiny downward move finds the ground.
+     */
+    @ModifyVariable(method = "move", at = @At("HEAD"), argsOnly = true)
+    private Vec3 keepGroundContact(final Vec3 movement, final MoverType type) {
+        final Entity entity = (Entity) (Object) this;
+        if (type == MoverType.SELF && movement.y == 0 && entity.onGround() && entity == Minecraft.getInstance().player
+            && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            return new Vec3(movement.x, -1.0E-7, movement.z);
+        }
+        return movement;
+    }
+
+    @Shadow
+    @Final
+    private LongSet visitedBlocks;
+
+    @Shadow
+    protected abstract boolean isAffectedByBlocks();
+
+    @Shadow
+    private int checkInsideBlocks(final Vec3 from, final Vec3 to, final InsideBlockEffectApplier.StepBasedCollector effectCollector, final LongSet visitedBlocks,
+                                  final int maxMovementIterations) {
+        throw new AssertionError();
+    }
+
+    /**
+     * Bedrock finds the blocks the player is inside, like cobwebs, only at its position after the move, while Java goes
+     * through the blocks along the whole move, as recorded when leaving a cobweb: Bedrock got free a tick before Java.
+     */
+    @Inject(method = "checkInsideBlocks(Ljava/util/List;Lnet/minecraft/world/entity/InsideBlockEffectApplier$StepBasedCollector;)V", at = @At("HEAD"), cancellable = true)
+    private void insideBlocksAtPosition(final List<?> movements, final InsideBlockEffectApplier.StepBasedCollector effectCollector, final CallbackInfo ci) {
+        final Entity entity = (Entity) (Object) this;
+        if (entity == Minecraft.getInstance().player && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            if (this.isAffectedByBlocks() && !movements.isEmpty()) {
+                this.checkInsideBlocks(entity.position(), entity.position(), effectCollector, this.visitedBlocks, 16);
+                this.visitedBlocks.clear();
+            }
+            ci.cancel();
+        }
     }
 
     @Unique
