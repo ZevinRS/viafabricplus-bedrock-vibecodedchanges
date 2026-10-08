@@ -80,6 +80,9 @@ public abstract class MixinClientPacketListener {
             BedrockImmobile.setImmobile(immobile);
         })) {
             ci.cancel();
+        } else if (Minecraft.getInstance().player == null || packet.id() == Minecraft.getInstance().player.getId()) {
+            // Not held back, like the flags the server sends before the player exists
+            BedrockImmobile.setImmobile(immobile);
         }
     }
 
