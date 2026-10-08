@@ -42,7 +42,7 @@
   "bedrock_create_account.viafabricplus.log_in": "Log in",
   "bedrock_create_account.viafabricplus.password": "Password: %s",
   "bedrock_create_account.viafabricplus.password_copied": "Password copied",
-  "bedrock_create_account.viafabricplus.link_copied": "Link copied too, for a private window",
+  "bedrock_create_account.viafabricplus.paste_private": "Link copied. Paste it into a private window.",
   "screen.viafabricplus.accept_invite": "Accept an invitation code",
 
   "bedrock_realms.viafabricplus.warning": "Add a Bedrock account in Bedrock Accounts first.",

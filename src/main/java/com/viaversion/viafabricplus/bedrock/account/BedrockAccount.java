@@ -172,11 +172,18 @@ public final class BedrockAccount {
     }
 
     public void login() {
-        this.thread = new Thread(this::performLogin, "ViaFabricPlus Bedrock login");
+        this.login(false);
+    }
+
+    /**
+     * @param privateWindow whether to sign in in a private browser window, for an account made for testing
+     */
+    public void login(final boolean privateWindow) {
+        this.thread = new Thread(() -> this.performLogin(privateWindow), "ViaFabricPlus Bedrock login");
         this.thread.start();
     }
 
-    private void performLogin() {
+    private void performLogin(final boolean privateWindow) {
         final Minecraft client = Minecraft.getInstance();
         final Screen prevScreen = client.gui.screen();
         try {
@@ -191,7 +198,7 @@ public final class BedrockAccount {
                             this.thread.interrupt();
                         }
                     }, TITLE, Component.translatable("bedrock_account.viafabricplus.notice"), Component.translatable("base.viafabricplus.copy_link"), Component.translatable("base.viafabricplus.cancel")));
-                    Blaze3D.openUri(URI.create(deviceCode.getDirectVerificationUri()));
+                    openPage(deviceCode.getDirectVerificationUri(), privateWindow);
                 });
             account.getChangeListeners().add(new ChangeListener() {
                 @Override
@@ -216,7 +223,7 @@ public final class BedrockAccount {
                 // A new Microsoft account has no Xbox profile until it signed in to Xbox once and picked a gamertag
                 VFPScreen.setScreen(new ConfirmScreen(openXbox -> {
                     if (openXbox) {
-                        Blaze3D.openUri(URI.create(XBOX_SIGN_IN));
+                        openPage(XBOX_SIGN_IN, privateWindow);
                     }
                     client.gui.setScreen(prevScreen);
                 }, Component.translatable("bedrock_accounts.viafabricplus.no_xbox_profile"),
@@ -227,6 +234,14 @@ public final class BedrockAccount {
             VFPScreen.setScreen(prevScreen);
             VFPScreen.showToast(xboxError != null ? Component.literal(xboxError.getMessage())
                 : Component.translatable("base.viafabricplus.something_went_wrong"));
+        }
+    }
+
+    private static void openPage(final String url, final boolean privateWindow) {
+        if (privateWindow) {
+            PrivateBrowser.open(url);
+        } else {
+            Blaze3D.openUri(URI.create(url));
         }
     }
 

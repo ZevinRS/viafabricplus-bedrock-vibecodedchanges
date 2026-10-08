@@ -21,11 +21,10 @@
 
 package com.viaversion.viafabricplus.bedrock.screen;
 
-import com.mojang.blaze3d.Blaze3D;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.account.BedrockAccount;
+import com.viaversion.viafabricplus.bedrock.account.PrivateBrowser;
 import com.viaversion.viafabricplus.screen.base.VFPScreen;
-import java.net.URI;
 import java.security.SecureRandom;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -36,7 +35,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Walks through making a new Microsoft account to test with. Microsoft only allows people to create accounts, so the
- * steps open its own pages to fill out in the browser, and the new account is logged in to at the end.
+ * steps open its own pages to fill out in a private browser window, and the new account is logged in to at the end.
  */
 public final class BedrockCreateAccountScreen extends VFPScreen {
 
@@ -107,14 +106,8 @@ public final class BedrockCreateAccountScreen extends VFPScreen {
         return 40 + step * STEP_HEIGHT;
     }
 
-    /**
-     * Opens the page in the browser and copies its link, for pasting into a private window that isn't signed in to
-     * another account.
-     */
     private static void open(final String url) {
-        Blaze3D.openUri(URI.create(url));
-        Minecraft.getInstance().keyboardHandler.setClipboard(url);
-        VFPScreen.showToast(Component.translatable("bedrock_create_account.viafabricplus.link_copied"));
+        PrivateBrowser.open(url);
     }
 
     private void copyPassword() {
@@ -131,7 +124,7 @@ public final class BedrockCreateAccountScreen extends VFPScreen {
     private void logIn() {
         this.accountBeforeLogin = ViaFabricPlusBedrock.impl().account().get();
         this.loggingIn = true;
-        ViaFabricPlusBedrock.impl().account().login();
+        ViaFabricPlusBedrock.impl().account().login(true);
     }
 
 }
