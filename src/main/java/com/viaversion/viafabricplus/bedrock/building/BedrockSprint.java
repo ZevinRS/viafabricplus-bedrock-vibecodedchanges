@@ -31,6 +31,9 @@ public final class BedrockSprint {
     // The part of the server's movement speed its modifiers don't explain, which Bedrock forgets when its sprint modifier changes
     public static final Identifier SERVER_VALUE_MODIFIER = Identifier.fromNamespaceAndPath("viafabricplus_bedrock", "server_value");
 
+    // Whether the player was in water in the previous tick
+    private static boolean inWaterLastTick;
+
     // Whether the player started and stopped sprinting during the current tick
     private static boolean startedThisTick;
     private static boolean stoppedThisTick;
@@ -44,8 +47,16 @@ public final class BedrockSprint {
     private BedrockSprint() {
     }
 
-    public static void onTickStart() {
+    /**
+     * Called before the player ticks, when the water state is still the one of the previous tick.
+     */
+    public static void onTickStart(final boolean inWater) {
         startedThisTick = stoppedThisTick = false;
+        inWaterLastTick = inWater;
+    }
+
+    public static boolean wasInWaterLastTick() {
+        return inWaterLastTick;
     }
 
     public static void onSprintChange(final boolean sprinting) {

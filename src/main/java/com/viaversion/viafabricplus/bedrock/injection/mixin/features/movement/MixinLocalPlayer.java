@@ -58,13 +58,15 @@ public abstract class MixinLocalPlayer {
         if (!ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
             return this.isSprintingPossible(allowedInShallowWater);
         }
-        final boolean jumpingInWater = instance.isInWater() && !instance.isSwimming() && !instance.onGround() && instance.input.keyPresses.jump();
+        // Bedrock still counts the player in the water in the tick it got out, as recorded when climbing out of water
+        final boolean inWater = instance.isInWater() || BedrockSprint.wasInWaterLastTick();
+        final boolean jumpingInWater = inWater && !instance.isSwimming() && !instance.onGround() && instance.input.keyPresses.jump();
         return this.isSprintingPossible(true) && !jumpingInWater;
     }
 
     @Inject(method = "tick", at = @At("HEAD"))
     private void rememberSprintingAtTickStart(final CallbackInfo ci) {
-        BedrockSprint.onTickStart();
+        BedrockSprint.onTickStart(((LocalPlayer) (Object) this).isInWater());
     }
 
     @Inject(method = "sendPosition", at = @At("HEAD"))
@@ -86,6 +88,16 @@ public abstract class MixinLocalPlayer {
     @ModifyExpressionValue(method = "aiStep", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Input;backward()Z"))
     private boolean keepSprintDoubleTap(final boolean backward) {
         return !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) && backward;
+    }
+
+    /**
+     * The pose follows the swimming a tick later on Bedrock (see MixinPlayer), so the tick after the swimming stopped out
+     * of the water would count as crawling on Java and slow the input. Bedrock doesn't slow it, as recorded when
+     * climbing out of water.
+     */
+    @WrapOperation(method = "isMovingSlowly", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;isVisuallyCrawling()Z"))
+    private boolean crawlOnlyWhileSwimming(final LocalPlayer instance, final Operation<Boolean> original) {
+        return original.call(instance) && (!ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) || instance.isSwimming());
     }
 
     /**
