@@ -63,7 +63,9 @@ public final class BedrockAccountsScreen extends VFPScreen {
         final Button addButton = Button.builder(Component.translatable("bedrock_accounts.viafabricplus.add"),
             _ -> ViaFabricPlusBedrock.impl().account().login()).build();
         this.removeButton = Button.builder(Component.translatable("bedrock_accounts.viafabricplus.remove"), _ -> this.confirmRemove()).build();
-        this.addFooter(this.useButton, addButton, this.removeButton);
+        final Button createButton = Button.builder(Component.translatable("bedrock_accounts.viafabricplus.create"),
+            _ -> new BedrockCreateAccountScreen().open(this)).build();
+        this.addFooter(this.useButton, addButton, createButton, this.removeButton);
         super.init();
     }
 

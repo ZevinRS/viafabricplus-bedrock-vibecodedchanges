@@ -47,6 +47,7 @@ import net.raphimc.minecraftauth.bedrock.BedrockAuthManager;
 import net.raphimc.minecraftauth.msa.model.MsaDeviceCode;
 import net.raphimc.minecraftauth.msa.service.impl.DeviceCodeMsaAuthService;
 import net.raphimc.minecraftauth.util.holder.listener.ChangeListener;
+import net.raphimc.minecraftauth.xbl.exception.XblRequestException;
 import net.raphimc.viabedrock.protocol.data.ProtocolConstants;
 import org.jetbrains.annotations.Nullable;
 
@@ -56,6 +57,8 @@ import org.jetbrains.annotations.Nullable;
 public final class BedrockAccount {
 
     private static final Component TITLE = Component.nullToEmpty("Microsoft Bedrock login");
+    // Signing in to Xbox with a new account asks for a gamertag and creates its Xbox profile
+    public static final String XBOX_SIGN_IN = "https://www.xbox.com/en-US/auth/msa?action=logIn&returnUrl=https%3A%2F%2Fwww.xbox.com%2Fen-US%2F";
 
     private final Path path;
     private final List<BedrockAuthManager> accounts = new CopyOnWriteArrayList<>();
@@ -208,9 +211,30 @@ public final class BedrockAccount {
 
             this.thread.interrupt();
             ViaFabricPlusBedrock.impl().logger().error("Failed to log in to the Bedrock account!", e);
+            final XblRequestException xboxError = xboxError(e);
+            if (xboxError != null && xboxError.getErrorCode() == XblRequestException.XO_E_ACCOUNT_CREATION_REQUIRED) {
+                // A new Microsoft account has no Xbox profile until it signed in to Xbox once and picked a gamertag
+                VFPScreen.setScreen(new ConfirmScreen(openXbox -> {
+                    if (openXbox) {
+                        Blaze3D.openUri(URI.create(XBOX_SIGN_IN));
+                    }
+                    client.gui.setScreen(prevScreen);
+                }, Component.translatable("bedrock_accounts.viafabricplus.no_xbox_profile"),
+                    Component.translatable("bedrock_accounts.viafabricplus.no_xbox_profile_notice"),
+                    Component.translatable("bedrock_accounts.viafabricplus.open_xbox"), Component.translatable("base.viafabricplus.cancel")));
+                return;
+            }
             VFPScreen.setScreen(prevScreen);
-            VFPScreen.showToast(Component.translatable("base.viafabricplus.something_went_wrong"));
+            VFPScreen.showToast(xboxError != null ? Component.literal(xboxError.getMessage())
+                : Component.translatable("base.viafabricplus.something_went_wrong"));
         }
+    }
+
+    private static @Nullable XblRequestException xboxError(@Nullable Throwable throwable) {
+        while (throwable != null && !(throwable instanceof XblRequestException)) {
+            throwable = throwable.getCause();
+        }
+        return (XblRequestException) throwable;
     }
 
     private static void updateLoginStatus(final BedrockAuthManager account, final Object value) {
