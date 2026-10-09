@@ -25,6 +25,7 @@ import com.viaversion.viaversion.libs.gson.JsonArray;
 import com.viaversion.viaversion.libs.gson.JsonElement;
 import com.viaversion.viaversion.libs.gson.JsonObject;
 import java.awt.image.BufferedImage;
+import java.util.function.Supplier;
 
 /**
  * Flat parts of entity models, like the walls of The Hive's SkyWars border, often have their texture on one side only.
@@ -40,8 +41,15 @@ public final class BedrockDoubleSidedPlanes {
     private BedrockDoubleSidedPlanes() {
     }
 
-    public static void apply(final JsonObject model, final BufferedImage texture) {
-        if (texture == null || !(model.get("elements") instanceof final JsonArray elements)) {
+    /**
+     * @param texture the model's texture, only decoded if the model has flat parts
+     */
+    public static void apply(final JsonObject model, final Supplier<BufferedImage> texture) {
+        if (!(model.get("elements") instanceof final JsonArray elements) || !hasFlatParts(elements)) {
+            return;
+        }
+        final BufferedImage image = texture.get();
+        if (image == null) {
             return;
         }
         for (final JsonElement element : elements) {
@@ -58,8 +66,8 @@ public final class BedrockDoubleSidedPlanes {
                 if (first == null || second == null) {
                     continue;
                 }
-                final boolean firstShown = isShown(first, texture);
-                final boolean secondShown = isShown(second, texture);
+                final boolean firstShown = isShown(first, image);
+                final boolean secondShown = isShown(second, image);
                 if (firstShown && !secondShown) {
                     second.add("uv", mirrored(first.getAsJsonArray("uv")));
                 } else if (secondShown && !firstShown) {
@@ -67,6 +75,19 @@ public final class BedrockDoubleSidedPlanes {
                 }
             }
         }
+    }
+
+    private static boolean hasFlatParts(final JsonArray elements) {
+        for (final JsonElement element : elements) {
+            if (element instanceof final JsonObject object && object.get("from") instanceof final JsonArray from && object.get("to") instanceof final JsonArray to) {
+                for (int axis = 0; axis < 3; axis++) {
+                    if (from.get(axis).getAsFloat() == to.get(axis).getAsFloat()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /**

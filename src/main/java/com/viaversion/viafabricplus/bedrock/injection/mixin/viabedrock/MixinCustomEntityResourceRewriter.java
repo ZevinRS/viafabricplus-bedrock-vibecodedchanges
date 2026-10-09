@@ -26,11 +26,10 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.resourcepack.BedrockEntityPoses;
+import com.viaversion.viafabricplus.bedrock.resourcepack.BedrockPackImages;
 import com.viaversion.viafabricplus.bedrock.resourcepack.BedrockDoubleSidedPlanes;
 import com.viaversion.viaversion.libs.gson.JsonObject;
 import java.util.Map;
-import net.raphimc.viabedrock.api.resourcepack.ResourcePack;
-import net.raphimc.viabedrock.api.resourcepack.content.Content;
 import net.raphimc.viabedrock.api.resourcepack.definition.EntityDefinitions;
 import net.raphimc.viabedrock.protocol.rewriter.resourcepack.CustomEntityResourceRewriter;
 import net.raphimc.viabedrock.protocol.storage.ResourcePackStorage;
@@ -65,13 +64,7 @@ public abstract class MixinCustomEntityResourceRewriter {
     private JsonObject showFlatPartsFromBothSides(final JavaItemModel itemModel, final Operation<JsonObject> original,
                                                   @Local(argsOnly = true) final ResourcePackStorage resourcePackStorage, @Local(ordinal = 1) final Map.Entry<String, String> textureEntry) {
         final JsonObject model = original.call(itemModel);
-        for (final ResourcePack pack : resourcePackStorage.getPackStackTopToBottom()) {
-            final Content.LazyImage texture = pack.content().getShortnameImage(textureEntry.getValue());
-            if (texture != null) {
-                BedrockDoubleSidedPlanes.apply(model, texture.getImage());
-                break;
-            }
-        }
+        BedrockDoubleSidedPlanes.apply(model, () -> BedrockPackImages.get(resourcePackStorage, textureEntry.getValue()));
         return model;
     }
 
