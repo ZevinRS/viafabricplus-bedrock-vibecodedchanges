@@ -28,6 +28,7 @@ import com.viaversion.viafabricplus.bedrock.building.BedrockDimensionChange;
 import com.viaversion.viafabricplus.bedrock.building.BedrockImmobile;
 import com.viaversion.viafabricplus.bedrock.building.BedrockKnockback;
 import com.viaversion.viafabricplus.bedrock.building.BedrockPacketDelay;
+import com.viaversion.viafabricplus.bedrock.resourcepack.BedrockNameTags;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
@@ -85,6 +86,11 @@ public abstract class MixinClientPacketListener {
             // Not held back, like the flags the server sends before the player exists
             BedrockImmobile.setImmobile(immobile);
         }
+    }
+
+    @Inject(method = "handleLogin", at = @At("HEAD"))
+    private void forgetNameTags(final CallbackInfo ci) {
+        BedrockNameTags.clear();
     }
 
     @Inject(method = {"handleLogin", "handleRespawn"}, at = @At("TAIL"))
