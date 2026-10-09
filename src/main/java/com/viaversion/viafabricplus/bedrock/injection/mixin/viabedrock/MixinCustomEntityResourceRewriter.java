@@ -26,6 +26,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.resourcepack.BedrockEntityPoses;
+import com.viaversion.viafabricplus.bedrock.resourcepack.BedrockModelBounds;
 import com.viaversion.viafabricplus.bedrock.resourcepack.BedrockPackImages;
 import com.viaversion.viafabricplus.bedrock.resourcepack.BedrockDoubleSidedPlanes;
 import com.viaversion.viaversion.libs.gson.JsonObject;
@@ -64,6 +65,10 @@ public abstract class MixinCustomEntityResourceRewriter {
     private JsonObject showFlatPartsFromBothSides(final JavaItemModel itemModel, final Operation<JsonObject> original,
                                                   @Local(argsOnly = true) final ResourcePackStorage resourcePackStorage, @Local(ordinal = 1) final Map.Entry<String, String> textureEntry) {
         final JsonObject model = original.call(itemModel);
+        final float shrink = BedrockModelBounds.fit(model);
+        if (shrink < 1F) {
+            itemModel.setScale(itemModel.getScale() / shrink);
+        }
         BedrockDoubleSidedPlanes.apply(model, () -> BedrockPackImages.get(resourcePackStorage, textureEntry.getValue()));
         return model;
     }

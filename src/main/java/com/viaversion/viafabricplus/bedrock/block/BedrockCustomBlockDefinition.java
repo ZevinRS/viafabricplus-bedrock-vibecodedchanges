@@ -37,7 +37,8 @@ import org.jetbrains.annotations.Nullable;
  * @param friction      Java's friction, 0.6 by default
  * @param destroyTime   the time to break it, like Java's destroy time
  * @param lightEmission the light it gives off
+ * @param lightFilter   how much light it takes away when passing through, from 0 to 15
  */
 public record BedrockCustomBlockDefinition(String name, @Nullable String geometry, Map<String, String> textures, float[] rotation, VoxelShape collision,
-                                           VoxelShape outline, float friction, float destroyTime, int lightEmission) {
+                                           VoxelShape outline, float friction, float destroyTime, int lightEmission, int lightFilter) {
 }

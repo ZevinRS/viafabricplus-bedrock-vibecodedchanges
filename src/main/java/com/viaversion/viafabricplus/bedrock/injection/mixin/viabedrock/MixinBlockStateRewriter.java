@@ -37,6 +37,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import net.raphimc.viabedrock.api.model.BedrockBlockState;
 import net.raphimc.viabedrock.api.model.BlockState;
+import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.data.BedrockMappingData;
 import net.raphimc.viabedrock.protocol.model.BlockProperties;
 import net.raphimc.viabedrock.protocol.rewriter.BlockStateRewriter;
@@ -47,6 +48,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = BlockStateRewriter.class, remap = false)
 public abstract class MixinBlockStateRewriter implements IBlockStateRewriter {
@@ -90,6 +92,17 @@ public abstract class MixinBlockStateRewriter implements IBlockStateRewriter {
         final Set<BedrockBlockState> states = new LinkedHashSet<>(original.call(mappings));
         states.removeIf(state -> SERVER_DEFINED_VANILLA_BLOCKS.matcher(state.namespacedIdentifier()).matches() && !defined.contains(state.namespacedIdentifier()));
         return states;
+    }
+
+    /**
+     * The blocks for the blocks servers define aren't vanilla blocks with a waterlogged property, see
+     * {@link BedrockCustomBlockMapping}.
+     */
+    @Inject(method = "waterlog", at = @At("HEAD"), cancellable = true)
+    private void dontWaterlogCustomBlocks(final int javaBlockStateId, final CallbackInfoReturnable<Integer> cir) {
+        if (!BedrockProtocol.MAPPINGS.getJavaBlockStates().containsValue(javaBlockStateId)) {
+            cir.setReturnValue(javaBlockStateId);
+        }
     }
 
 }

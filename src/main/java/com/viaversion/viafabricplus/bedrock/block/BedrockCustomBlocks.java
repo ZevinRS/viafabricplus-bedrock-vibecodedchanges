@@ -101,6 +101,54 @@ public final class BedrockCustomBlocks implements ModInitializer {
     public static void setDefinitions(final BedrockCustomBlockDefinition[] full, final BedrockCustomBlockDefinition[] shaped) {
         fullDefinitions = full;
         shapedDefinitions = shaped;
+        lightEmissions = null;
+        lightFilters = null;
+    }
+
+    // ViaBedrock's light emission and light filter of every Java block state, with the pool blocks added
+    private static volatile byte[] lightEmissions;
+    private static volatile byte[] lightFilters;
+
+    /**
+     * ViaBedrock lights chunks itself, with tables of the vanilla block states only.
+     *
+     * @return ViaBedrock's light emission table with the pool blocks added
+     */
+    public static byte[] lightEmissions(final byte[] vanillaTable) {
+        byte[] table = lightEmissions;
+        if (table == null) {
+            lightEmissions = table = withPoolBlocks(vanillaTable, true);
+        }
+        return table;
+    }
+
+    /**
+     * @return ViaBedrock's light filter table with the pool blocks added
+     */
+    public static byte[] lightFilters(final byte[] vanillaTable) {
+        byte[] table = lightFilters;
+        if (table == null) {
+            lightFilters = table = withPoolBlocks(vanillaTable, false);
+        }
+        return table;
+    }
+
+    private static byte[] withPoolBlocks(final byte[] vanillaTable, final boolean emission) {
+        final byte[] table = new byte[Math.max(vanillaTable.length, Block.BLOCK_STATE_REGISTRY.size())];
+        System.arraycopy(vanillaTable, 0, table, 0, vanillaTable.length);
+        fill(table, FULL, fullDefinitions, emission);
+        fill(table, SHAPED, shapedDefinitions, emission);
+        return table;
+    }
+
+    private static void fill(final byte[] table, final List<Block> blocks, final BedrockCustomBlockDefinition[] definitions, final boolean emission) {
+        for (int i = 0; i < blocks.size(); i++) {
+            final BedrockCustomBlockDefinition definition = definitions[i];
+            final int stateId = Block.getId(blocks.get(i).defaultBlockState());
+            if (stateId < table.length) {
+                table[stateId] = (byte) (definition == null ? 0 : emission ? definition.lightEmission() : definition.lightFilter());
+            }
+        }
     }
 
 }

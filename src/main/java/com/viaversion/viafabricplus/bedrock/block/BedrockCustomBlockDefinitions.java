@@ -121,7 +121,8 @@ public final class BedrockCustomBlockDefinitions {
         final float friction = components.get("minecraft:friction") instanceof final CompoundTag frictionTag ? 1F - frictionTag.getFloat("value", 0.4F) : 0.6F;
         final float destroyTime = components.get("minecraft:destructible_by_mining") instanceof final CompoundTag destructible ? destructible.getFloat("value", 0F) : 0F;
         final int lightEmission = components.get("minecraft:light_emission") instanceof final CompoundTag light ? light.getInt("emission", 0) : 0;
-        return new BedrockCustomBlockDefinition(name, geometry, textures, rotation, collision, outline, friction, destroyTime, lightEmission);
+        final int lightFilter = components.get("minecraft:block_light_filter") instanceof final CompoundTag filter ? filter.getInt("lightLevel", 15) : 15;
+        return new BedrockCustomBlockDefinition(name, geometry, textures, rotation, collision, outline, friction, destroyTime, lightEmission, lightFilter);
     }
 
     /**
