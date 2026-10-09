@@ -35,4 +35,11 @@ public interface IEntityRenderState {
 
     void viaFabricPlusBedrock$setBodyHidden(boolean hidden);
 
+    /**
+     * @return the renderer of the player's 4D skin that extracted the state, or null
+     */
+    @Nullable Object viaFabricPlusBedrock$getSkinRenderer();
+
+    void viaFabricPlusBedrock$setSkinRenderer(@Nullable Object renderer);
+
 }

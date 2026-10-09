@@ -30,12 +30,16 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A Bedrock geometry as Java model parts, one per bone and one more per rotated cube, posed by {@link Pose}.
@@ -61,18 +65,89 @@ public final class BedrockModel extends Model<BedrockModel.Pose> {
 
     public static BedrockModel of(final BedrockGeometry geometry) {
         final Map<String, ModelPart> parts = new LinkedHashMap<>();
+        final ModelPart root = build(geometry, name -> "bone_" + name, (name, parent) -> parent, name -> false, parts, new HashMap<>());
+        return new BedrockModel(root, Collections.unmodifiableMap(parts));
+    }
+
+    /**
+     * A player's geometry as the parts of Java's player model: the bones Java animates get Java's names and the parents
+     * Java's model has, the head, body, arms and legs directly in the root, and the other bones stay in them. Parts the
+     * geometry doesn't have are added empty where Java's model has them, so held items still find the arms.
+     *
+     * @return the root of the parts
+     */
+    public static ModelPart playerRoot(final BedrockGeometry geometry, final boolean slim) {
+        final Map<String, ModelPart> parts = new LinkedHashMap<>();
         final Map<String, Map<String, ModelPart>> children = new HashMap<>();
+        // Java draws capes with the cape texture, the cape bone would be drawn with the skin
+        final ModelPart root = build(geometry, name -> PLAYER_PARTS.getOrDefault(name, "bone_" + name),
+            (name, parent) -> PLAYER_PARENTS.containsKey(name) ? PLAYER_PARENTS.get(name) : parent, name -> name.equals("cape"), parts, children);
+        final float armY = slim ? 21.5F : 22F;
+        final Map<String, float[]> defaultPivots = Map.of("head", new float[]{0, 24, 0}, "body", new float[]{0, 24, 0}, "rightarm", new float[]{-5, armY, 0},
+            "leftarm", new float[]{5, armY, 0}, "rightleg", new float[]{-1.9F, 12, 0}, "leftleg", new float[]{1.9F, 12, 0});
+        for (final Map.Entry<String, float[]> main : defaultPivots.entrySet()) {
+            if (!parts.containsKey(main.getKey())) {
+                final Map<String, ModelPart> partChildren = new LinkedHashMap<>();
+                final ModelPart part = new ModelPart(List.of(), partChildren);
+                final float[] pivot = javaPoint(main.getValue());
+                part.setInitialPose(PartPose.offset(pivot[0], pivot[1], pivot[2]));
+                part.resetPose();
+                children.get("").put(PLAYER_PARTS.get(main.getKey()), part);
+                children.put(main.getKey(), partChildren);
+                parts.put(main.getKey(), part);
+            }
+        }
+        for (final Map.Entry<String, String> overlay : PLAYER_PARENTS.entrySet()) {
+            if (overlay.getValue() != null && !parts.containsKey(overlay.getKey())) {
+                children.get(overlay.getValue()).put(PLAYER_PARTS.get(overlay.getKey()), new ModelPart(List.of(), Map.of()));
+            }
+        }
+        return root;
+    }
+
+    // Java's names of the bones of Bedrock's player geometry
+    private static final Map<String, String> PLAYER_PARTS = Map.ofEntries(Map.entry("head", "head"), Map.entry("hat", "hat"), Map.entry("body", "body"),
+        Map.entry("jacket", "jacket"), Map.entry("rightarm", "right_arm"), Map.entry("leftarm", "left_arm"), Map.entry("rightsleeve", "right_sleeve"),
+        Map.entry("leftsleeve", "left_sleeve"), Map.entry("rightleg", "right_leg"), Map.entry("leftleg", "left_leg"), Map.entry("rightpants", "right_pants"),
+        Map.entry("leftpants", "left_pants"));
+    // Their parents in Java's model, null for the root
+    private static final Map<String, String> PLAYER_PARENTS = new HashMap<>();
+
+    static {
+        for (final String main : new String[]{"head", "body", "rightarm", "leftarm", "rightleg", "leftleg"}) {
+            PLAYER_PARENTS.put(main, null);
+        }
+        PLAYER_PARENTS.put("hat", "head");
+        PLAYER_PARENTS.put("jacket", "body");
+        PLAYER_PARENTS.put("rightsleeve", "rightarm");
+        PLAYER_PARENTS.put("leftsleeve", "leftarm");
+        PLAYER_PARENTS.put("rightpants", "rightleg");
+        PLAYER_PARENTS.put("leftpants", "leftleg");
+    }
+
+    /**
+     * @param childKey  the name a bone has among its parent's children, by its lowercase name
+     * @param parentOf  the lowercase name of a bone's parent, by its name and the parent the geometry gives it
+     * @param skipCubes whether a bone's cubes are left out, by its lowercase name
+     * @param parts     filled with the part of every bone by lowercase name
+     * @param children  filled with the children of every part by its lowercase name, the root's by ""
+     * @return the root part
+     */
+    private static ModelPart build(final BedrockGeometry geometry, final Function<String, String> childKey,
+                                   final BiFunction<String, @Nullable String, @Nullable String> parentOf, final Predicate<String> skipCubes,
+                                   final Map<String, ModelPart> parts, final Map<String, Map<String, ModelPart>> children) {
         final Map<String, BedrockGeometry.Bone> byName = new HashMap<>();
         for (final BedrockGeometry.Bone bone : geometry.bones()) {
             byName.put(bone.name().toLowerCase(Locale.ROOT), bone);
         }
 
         for (final BedrockGeometry.Bone bone : geometry.bones()) {
+            final String name = bone.name().toLowerCase(Locale.ROOT);
             final Map<String, ModelPart> boneChildren = new LinkedHashMap<>();
             final List<ModelPart.Cube> cubes = new ArrayList<>();
             final float[] pivot = javaPoint(bone.pivot());
             int rotatedCubes = 0;
-            for (final BedrockGeometry.Cube cube : bone.cubes()) {
+            for (final BedrockGeometry.Cube cube : skipCubes.test(name) ? List.<BedrockGeometry.Cube>of() : bone.cubes()) {
                 if (cube.rotation() == null || isZero(cube.rotation())) {
                     cubes.add(cube(cube, pivot, geometry));
                     continue;
@@ -85,26 +160,25 @@ public final class BedrockModel extends Model<BedrockModel.Pose> {
                 cubePart.resetPose();
                 boneChildren.put("cube_" + rotatedCubes++, cubePart);
             }
-            final ModelPart part = new ModelPart(cubes, boneChildren);
-            final String name = bone.name().toLowerCase(Locale.ROOT);
-            parts.put(name, part);
+            parts.put(name, new ModelPart(cubes, boneChildren));
             children.put(name, boneChildren);
         }
 
         final Map<String, ModelPart> rootChildren = new LinkedHashMap<>();
+        children.put("", rootChildren);
         for (final BedrockGeometry.Bone bone : geometry.bones()) {
             final String name = bone.name().toLowerCase(Locale.ROOT);
             final ModelPart part = parts.get(name);
-            final String parentName = bone.parent() != null ? bone.parent().toLowerCase(Locale.ROOT) : null;
+            final String parentName = parentOf.apply(name, bone.parent() != null ? bone.parent().toLowerCase(Locale.ROOT) : null);
             final BedrockGeometry.Bone parent = parentName != null && !parentName.equals(name) ? byName.get(parentName) : null;
             final float[] pivot = javaPoint(bone.pivot());
             final float[] parentPivot = parent != null ? javaPoint(parent.pivot()) : new float[3];
             part.setInitialPose(PartPose.offsetAndRotation(pivot[0] - parentPivot[0], pivot[1] - parentPivot[1], pivot[2] - parentPivot[2],
                 bone.rotation()[0] * Mth.DEG_TO_RAD, bone.rotation()[1] * Mth.DEG_TO_RAD, bone.rotation()[2] * Mth.DEG_TO_RAD));
             part.resetPose();
-            (parent != null ? children.get(parentName) : rootChildren).put("bone_" + name, part);
+            (parent != null ? children.get(parentName) : rootChildren).put(childKey.apply(name), part);
         }
-        return new BedrockModel(new ModelPart(List.of(), rootChildren), Collections.unmodifiableMap(parts));
+        return new ModelPart(List.of(), rootChildren);
     }
 
     /**

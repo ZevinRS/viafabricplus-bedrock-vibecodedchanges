@@ -21,11 +21,14 @@
 
 package com.viaversion.viafabricplus.bedrock.friends;
 
+import com.viaversion.viafabricplus.bedrock.render.BedrockSkins;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import java.util.Map;
+import java.util.UUID;
+import net.raphimc.viabedrock.protocol.model.SkinData;
 import net.raphimc.viabedrock.protocol.provider.SkinProvider;
 
-/** Adds the host-issued session nonce to Bedrock's client data for friend worlds. */
+/** Adds the host-issued session nonce to Bedrock's client data for friend worlds, and keeps the skins of other players. */
 public final class FriendWorldSkinProvider extends SkinProvider {
 
     @Override
@@ -36,6 +39,15 @@ public final class FriendWorldSkinProvider extends SkinProvider {
             claims.put("Nonce", nonce);
         }
         return claims;
+    }
+
+    /**
+     * Keeps the skins of other players for Java to draw, which ViaBedrock only passes to companion mods.
+     */
+    @Override
+    public void setSkin(final UserConnection user, final UUID playerUuid, final SkinData skin) {
+        BedrockSkins.put(playerUuid, skin);
+        super.setSkin(user, playerUuid, skin);
     }
 
 }

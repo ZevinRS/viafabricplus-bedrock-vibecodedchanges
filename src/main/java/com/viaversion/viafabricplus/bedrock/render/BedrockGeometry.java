@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -58,6 +59,15 @@ public record BedrockGeometry(String identifier, float textureWidth, float textu
      * @return every geometry of a geometry file by identifier
      */
     public static Map<String, BedrockGeometry> parseFile(final JsonObject file) {
+        return parseFile(file, name -> null);
+    }
+
+    /**
+     * @param externalParents geometries in the older format that the file's can extend without having them, like
+     *                        skins extending Bedrock's own humanoid geometry
+     * @return every geometry of a geometry file by identifier
+     */
+    public static Map<String, BedrockGeometry> parseFile(final JsonObject file, final Function<String, @Nullable JsonObject> externalParents) {
         final Map<String, BedrockGeometry> geometries = new LinkedHashMap<>();
         if (file.get("minecraft:geometry") instanceof final JsonArray list) {
             for (final JsonElement element : list) {
@@ -83,7 +93,8 @@ public record BedrockGeometry(String identifier, float textureWidth, float textu
             }
         }
         for (final Map.Entry<String, JsonObject> entry : objects.entrySet()) {
-            final JsonObject parent = objects.get(parents.get(entry.getKey()));
+            final String parentName = parents.get(entry.getKey());
+            final JsonObject parent = parentName == null ? null : objects.containsKey(parentName) ? objects.get(parentName) : externalParents.apply(parentName);
             geometries.put(entry.getKey(), parse(entry.getKey(), entry.getValue(), entry.getValue(), parent));
         }
         return geometries;

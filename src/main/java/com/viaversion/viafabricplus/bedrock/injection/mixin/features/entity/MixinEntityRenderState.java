@@ -38,6 +38,9 @@ public abstract class MixinEntityRenderState implements IEntityRenderState {
     @Unique
     private boolean viaFabricPlusBedrock$bodyHidden;
 
+    @Unique
+    private @Nullable Object viaFabricPlusBedrock$skinRenderer;
+
     @Override
     public @Nullable List<Component> viaFabricPlusBedrock$getNameLines() {
         return this.viaFabricPlusBedrock$nameLines;
@@ -56,6 +59,16 @@ public abstract class MixinEntityRenderState implements IEntityRenderState {
     @Override
     public void viaFabricPlusBedrock$setBodyHidden(final boolean hidden) {
         this.viaFabricPlusBedrock$bodyHidden = hidden;
+    }
+
+    @Override
+    public @Nullable Object viaFabricPlusBedrock$getSkinRenderer() {
+        return this.viaFabricPlusBedrock$skinRenderer;
+    }
+
+    @Override
+    public void viaFabricPlusBedrock$setSkinRenderer(final @Nullable Object renderer) {
+        this.viaFabricPlusBedrock$skinRenderer = renderer;
     }
 
 }

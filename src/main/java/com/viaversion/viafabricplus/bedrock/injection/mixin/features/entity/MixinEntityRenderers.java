@@ -22,6 +22,7 @@
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.entity;
 
 import com.viaversion.viafabricplus.bedrock.render.BedrockEntityRenderer;
+import com.viaversion.viafabricplus.bedrock.render.BedrockSkinRenderer;
 import java.util.Map;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.EntityRenderers;
@@ -34,10 +35,12 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * Draws the custom entities ViaBedrock spawns interaction entities for, see {@link BedrockEntityRenderer}. Other
- * interaction entities stay invisible.
+ * interaction entities stay invisible. Keeps the context renderers are made with for the renderers of 4D skins, see
+ * {@link BedrockSkinRenderer}.
  */
 @Mixin(EntityRenderers.class)
 public abstract class MixinEntityRenderers {
@@ -45,6 +48,11 @@ public abstract class MixinEntityRenderers {
     @Shadow
     @Final
     private static Map<EntityType<?>, EntityRendererProvider<?>> PROVIDERS;
+
+    @Inject(method = "createAvatarRenderers", at = @At("HEAD"))
+    private static void rememberContext(final EntityRendererProvider.Context context, final CallbackInfoReturnable<?> cir) {
+        BedrockSkinRenderer.setContext(context);
+    }
 
     @Inject(method = "<clinit>", at = @At("TAIL"))
     private static void drawBedrockModels(final CallbackInfo ci) {
