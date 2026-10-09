@@ -24,6 +24,11 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.bedrock.building.BedrockAuthInput;
+import com.viaversion.viafabricplus.bedrock.building.BedrockBlockBreak;
+import com.viaversion.viaversion.api.type.Type;
+import com.viaversion.viaversion.api.type.Types;
+import net.raphimc.viabedrock.protocol.model.inventory.BedrockInventoryTransaction;
+import org.spongepowered.asm.mixin.Unique;
 import com.viaversion.viafabricplus.bedrock.building.BedrockItemUse;
 import java.util.Set;
 import net.raphimc.viabedrock.api.util.MathUtil;
@@ -104,6 +109,32 @@ public abstract class MixinClientPlayerPackets {
             wrapper.user().get(EntityTracker.class).getClientPlayer().addAuthInputBlockAction(
                 new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.AbortDestroyBlock, state.brokenPosition(), 0));
             state.setBrokenPosition(null);
+        }
+    }
+
+
+    @Unique
+    private static BedrockInventoryTransaction viaFabricPlusBedrock$breakTransaction;
+
+    /**
+     * A block broken in the tick is reported with the input, see {@link BedrockBlockBreak}.
+     */
+    @Inject(method = "lambda$register$18", at = @At("HEAD"))
+    private static void prepareBlockBreak(final PacketWrapper wrapper, final CallbackInfo ci) {
+        viaFabricPlusBedrock$breakTransaction = BedrockBlockBreak.prepareInput(wrapper.user());
+    }
+
+    /**
+     * The first boolean of the input is the presence of the item use, which ViaBedrock always leaves out.
+     */
+    @WrapOperation(method = "lambda$register$18", at = @At(value = "INVOKE", target = "Lcom/viaversion/viaversion/api/protocol/packet/PacketWrapper;write(Lcom/viaversion/viaversion/api/type/Type;Ljava/lang/Object;)V"))
+    private static void writeBlockBreak(final PacketWrapper wrapper, final Type<?> type, final Object value, final Operation<Void> original) {
+        final BedrockInventoryTransaction transaction = viaFabricPlusBedrock$breakTransaction;
+        if (transaction != null && (Object) type == Types.BOOLEAN) {
+            viaFabricPlusBedrock$breakTransaction = null;
+            BedrockBlockBreak.writeInput(wrapper, transaction);
+        } else {
+            original.call(wrapper, type, value);
         }
     }
 

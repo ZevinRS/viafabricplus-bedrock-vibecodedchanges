@@ -23,11 +23,14 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.features.block;
 
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.building.BedrockBlockBreak;
 import com.viaversion.viafabricplus.bedrock.building.BedrockBuilding;
 import com.viaversion.viafabricplus.bedrock.building.BedrockItemUse;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.world.InteractionHand;
@@ -37,7 +40,9 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.phys.BlockHitResult;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -45,6 +50,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(MultiPlayerGameMode.class)
 public abstract class MixinMultiPlayerGameMode {
+
+    @Shadow
+    @Final
+    private Minecraft minecraft;
 
     /**
      * ViaBedrock doesn't handle CHANGE_DESTROY_DIRECTION (sent when the targeted face changes while mining) and
@@ -99,6 +108,16 @@ public abstract class MixinMultiPlayerGameMode {
     private void startUsingItem(final Player player, final InteractionHand hand, final CallbackInfoReturnable<InteractionResult> cir) {
         if (hand == InteractionHand.MAIN_HAND && player instanceof final LocalPlayer localPlayer) {
             BedrockItemUse.onItemUsed(localPlayer);
+        }
+    }
+
+    /**
+     * Notes how the held tool wears down, which the Bedrock client reports with the broken block, see {@link BedrockBlockBreak}.
+     */
+    @Inject(method = "destroyBlock", at = @At("HEAD"))
+    private void recordToolDamage(final BlockPos pos, final CallbackInfoReturnable<Boolean> cir) {
+        if (BedrockProtocolVersion.BEDROCK_LATEST.equals(ViaFabricPlus.api().targetVersion()) && this.minecraft.player != null && this.minecraft.level != null) {
+            BedrockBlockBreak.onDestroyBlock(this.minecraft.player, this.minecraft.level, pos);
         }
     }
 

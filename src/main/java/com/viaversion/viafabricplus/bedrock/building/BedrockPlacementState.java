@@ -81,6 +81,22 @@ public final class BedrockPlacementState implements StorableObject {
         return cracked;
     }
 
+    // The block broken in this tick, reported with the tick's input, see BedrockBlockBreak
+    private BrokenBlock brokenBlock;
+
+    public void setBrokenBlock(final BrokenBlock brokenBlock) {
+        this.brokenBlock = brokenBlock;
+    }
+
+    public BrokenBlock takeBrokenBlock() {
+        final BrokenBlock brokenBlock = this.brokenBlock;
+        this.brokenBlock = null;
+        return brokenBlock;
+    }
+
+    public record BrokenBlock(BlockPosition position, int face, int toolDamage) {
+    }
+
     public int nextLegacyRequestId() {
         final int id = this.nextLegacyRequestId;
         this.nextLegacyRequestId -= 2;

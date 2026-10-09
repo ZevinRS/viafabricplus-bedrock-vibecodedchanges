@@ -326,7 +326,7 @@ public final class BedrockInventoryTranslator {
      * Updates a tracked slot. Like the Bedrock client, the held item is only sent again when it became another item,
      * not when only its count changed.
      */
-    private static void setItem(final UserConnection user, final Container container, final int index, final BedrockItem item) {
+    public static void setItem(final UserConnection user, final Container container, final int index, final BedrockItem item) {
         if (container instanceof final InventoryContainer inventory && index == inventory.getSelectedHotbarSlot()
             && !item.isEmpty() && !inventory.getItem(index).isEmpty() && !item.isDifferent(inventory.getItem(index))) {
             BedrockPlacementTranslator.state(user).equip(index, item);

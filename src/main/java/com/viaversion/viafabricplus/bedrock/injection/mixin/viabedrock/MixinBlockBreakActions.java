@@ -25,6 +25,7 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
+import com.viaversion.viafabricplus.bedrock.building.BedrockBlockBreak;
 import com.viaversion.viafabricplus.bedrock.building.BedrockPlacementState;
 import com.viaversion.viafabricplus.bedrock.building.BedrockPlacementTranslator;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
@@ -40,6 +41,7 @@ import org.spongepowered.asm.mixin.injection.At;
  * client sends them there. Once a block broke it sends stop_break at 0 0 0 with face 0 and a last crack_break, but no
  * abort_break; ViaBedrock also aborted the broken block right away, which made the server cancel the break. The
  * broken block is only aborted once the next one starts breaking, or the attack ends, see {@link BedrockPlacementTranslator}.
+ * The break itself is reported with the next input, see {@link BedrockBlockBreak}.
  */
 @Mixin(value = ClientPlayerPackets.class, remap = false)
 public abstract class MixinBlockBreakActions {
@@ -60,6 +62,13 @@ public abstract class MixinBlockBreakActions {
     @WrapOperation(method = "lambda$register$9", at = @At(value = "INVOKE", target = ADD_BLOCK_ACTION, ordinal = 2))
     private static void stopAtOrigin(final ClientPlayerEntity player, final ClientPlayerEntity.AuthInputBlockAction action, final Operation<Void> original) {
         original.call(player, new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.StopDestroyBlock, new BlockPosition(0, 0, 0), 0));
+    }
+
+    @WrapOperation(method = "lambda$register$9", at = @At(value = "INVOKE", target = ADD_BLOCK_ACTION, ordinal = 3))
+    private static void reportBrokenBlock(final ClientPlayerEntity player, final ClientPlayerEntity.AuthInputBlockAction action, final Operation<Void> original,
+                                          @Local(argsOnly = true) final PacketWrapper wrapper) {
+        original.call(player, action);
+        BedrockBlockBreak.onBlockBroken(wrapper.user(), action.position(), action.direction());
     }
 
     @WrapOperation(method = "lambda$register$9", at = @At(value = "INVOKE", target = ADD_BLOCK_ACTION, ordinal = 4))
