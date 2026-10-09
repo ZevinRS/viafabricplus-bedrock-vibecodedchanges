@@ -83,6 +83,7 @@
     "viabedrock.MixinInteractionPackets",
     "viabedrock.MixinInventoryContainer",
     "viabedrock.MixinInventoryPackets",
+    "viabedrock.MixinItemRewriter",
     "viabedrock.MixinJoinPackets",
     "viabedrock.MixinLivingEntity",
     "viabedrock.MixinOffhandContainer",
