@@ -71,6 +71,7 @@
     "viabedrock.MixinBlockStateRewriter",
     "viabedrock.MixinChunkTracker",
     "viabedrock.MixinClientPlayerPackets",
+    "viabedrock.MixinContainer",
     "viabedrock.MixinDimensionChangeAck",
     "viabedrock.MixinDimensionChangePackets",
     "viabedrock.MixinGlyphSheetResourceRewriter",
