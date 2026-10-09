@@ -94,6 +94,13 @@ public abstract class MixinClientPacketListener {
         }
     }
 
+    @Inject(method = "handleMovePlayer", at = @At("TAIL"))
+    private void stayAfterTeleport(final CallbackInfo ci) {
+        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            BedrockImmobile.onTeleported();
+        }
+    }
+
     @Inject(method = "handleRespawn", at = @At("TAIL"))
     private void startDimensionChangeLoading(final CallbackInfo ci) {
         if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {

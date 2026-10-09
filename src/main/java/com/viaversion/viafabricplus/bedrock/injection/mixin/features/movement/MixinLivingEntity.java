@@ -66,13 +66,16 @@ public abstract class MixinLivingEntity {
     /**
      * An immobile player doesn't move at all on Bedrock, not even by gravity, and its velocity is cleared every tick.
      * Looking around and the input it sends stay the same. Neither does a player in the loading screen of a dimension
-     * change.
+     * change. A teleported player doesn't move in the tick it handles the teleport, see {@link BedrockImmobile}.
      */
     @Inject(method = "travel", at = @At("HEAD"), cancellable = true)
     private void stayWhileImmobile(final Vec3 input, final CallbackInfo ci) {
         if ((Object) this == Minecraft.getInstance().player && (BedrockImmobile.isImmobile() || BedrockDimensionChange.isLoading())
             && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
             ((LivingEntity) (Object) this).setDeltaMovement(Vec3.ZERO);
+            ci.cancel();
+        } else if ((Object) this == Minecraft.getInstance().player && BedrockImmobile.takeTeleported()
+            && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
             ci.cancel();
         }
     }

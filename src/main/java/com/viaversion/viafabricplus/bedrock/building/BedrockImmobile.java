@@ -43,6 +43,24 @@ public final class BedrockImmobile {
         return immobile;
     }
 
+    // The Bedrock client doesn't move in the tick it handles a teleport from the server, so the input confirming it
+    // has the position the server sent, as recorded on The Hive. The server ignored the player after a confirmation
+    // from elsewhere.
+    private static boolean teleported;
+
+    public static void onTeleported() {
+        teleported = true;
+    }
+
+    /**
+     * @return whether the player was teleported since its last move
+     */
+    public static boolean takeTeleported() {
+        final boolean wasTeleported = teleported;
+        teleported = false;
+        return wasTeleported;
+    }
+
     public static void setImmobile(final boolean immobile) {
         BedrockImmobile.immobile = immobile;
     }
