@@ -21,10 +21,13 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 
+import com.google.common.collect.BiMap;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
+import com.viaversion.viafabricplus.bedrock.block.BedrockCustomBlockMapping;
 import com.viaversion.viafabricplus.bedrock.injection.access.IBlockStateRewriter;
+import com.viaversion.viaversion.libs.fastutil.ints.Int2IntMap;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -33,10 +36,13 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import net.raphimc.viabedrock.api.model.BedrockBlockState;
+import net.raphimc.viabedrock.api.model.BlockState;
 import net.raphimc.viabedrock.protocol.data.BedrockMappingData;
 import net.raphimc.viabedrock.protocol.model.BlockProperties;
 import net.raphimc.viabedrock.protocol.rewriter.BlockStateRewriter;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -45,6 +51,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(value = BlockStateRewriter.class, remap = false)
 public abstract class MixinBlockStateRewriter implements IBlockStateRewriter {
 
+    @Shadow
+    @Final
+    private Int2IntMap blockStateIdMappings;
+
+    @Shadow
+    @Final
+    private BiMap<BlockState, Integer> blockStateMappings;
+
     // The blocks the server defines, in the order the Bedrock client numbers them
     @Unique
     private List<String> viaFabricPlusBedrock$customBlocks = List.of();
@@ -52,6 +66,7 @@ public abstract class MixinBlockStateRewriter implements IBlockStateRewriter {
     @Inject(method = "<init>", at = @At("TAIL"))
     private void rememberCustomBlocks(final BlockProperties[] blockProperties, final boolean hashedRuntimeBlockIds, final CallbackInfo ci) {
         this.viaFabricPlusBedrock$customBlocks = Arrays.stream(blockProperties).map(BlockProperties::name).toList();
+        BedrockCustomBlockMapping.assign(blockProperties, this.blockStateMappings, this.blockStateIdMappings);
     }
 
     @Override

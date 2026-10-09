@@ -42,6 +42,7 @@
     "features.block.MixinLadderBlock",
     "features.block.MixinLanternBlock",
     "features.block.MixinLecternBlock",
+    "features.block.MixinBlockStateBase",
     "features.block.MixinMultiPlayerGameMode",
     "features.entity.MixinEntityRenderer",
     "features.entity.MixinEntityRenderState",

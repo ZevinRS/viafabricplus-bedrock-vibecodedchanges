@@ -21,8 +21,10 @@
 
 package com.viaversion.viafabricplus.bedrock.resourcepack;
 
+import com.viaversion.viaversion.libs.gson.JsonArray;
 import com.viaversion.viaversion.libs.gson.JsonElement;
 import com.viaversion.viaversion.libs.gson.JsonObject;
+import com.viaversion.viaversion.util.Key;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -33,7 +35,8 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * The parts of a server's resource packs ViaBedrock doesn't keep: client entity descriptions with their animations,
- * animations and animation controllers, with packs higher in the stack replacing lower ones.
+ * animations and animation controllers, the blocks of blocks.json and the block textures of terrain_texture.json, with
+ * packs higher in the stack replacing lower ones.
  */
 public final class BedrockPackIndex {
 
@@ -42,6 +45,8 @@ public final class BedrockPackIndex {
     private final Map<String, JsonObject> entityDescriptions = new HashMap<>();
     private final Map<String, JsonObject> animations = new HashMap<>();
     private final Map<String, JsonObject> animationControllers = new HashMap<>();
+    private final Map<String, JsonObject> blocks = new HashMap<>();
+    private final Map<String, String> terrainTextures = new HashMap<>();
 
     private BedrockPackIndex(final ResourcePackStorage storage) {
         for (final ResourcePack pack : storage.getPackStackBottomToTop()) {
@@ -56,6 +61,23 @@ public final class BedrockPackIndex {
             }
             for (final String path : pack.content().getFilesDeep("animation_controllers/", ".json")) {
                 putAll(this.animationControllers, object(read(pack, path), "animation_controllers"));
+            }
+            final JsonObject blocks = read(pack, "blocks.json");
+            if (blocks != null) {
+                for (final Map.Entry<String, JsonElement> block : blocks.entrySet()) {
+                    if (block.getValue().isJsonObject()) {
+                        this.blocks.put(Key.namespaced(block.getKey()), block.getValue().getAsJsonObject());
+                    }
+                }
+            }
+            final JsonObject textureData = object(read(pack, "textures/terrain_texture.json"), "texture_data");
+            if (textureData != null) {
+                for (final Map.Entry<String, JsonElement> texture : textureData.entrySet()) {
+                    final String path = texturePath(texture.getValue() instanceof final JsonObject entry ? entry.get("textures") : null);
+                    if (path != null) {
+                        this.terrainTextures.put(texture.getKey(), path);
+                    }
+                }
             }
         }
     }
@@ -74,6 +96,36 @@ public final class BedrockPackIndex {
 
     public @Nullable JsonObject animationController(final String identifier) {
         return this.animationControllers.get(identifier);
+    }
+
+    /**
+     * @return the block's entry in blocks.json
+     */
+    public @Nullable JsonObject block(final String identifier) {
+        return this.blocks.get(identifier);
+    }
+
+    /**
+     * @return the path of a block texture's short name in terrain_texture.json, without file extension
+     */
+    public @Nullable String terrainTexture(final String shortName) {
+        return this.terrainTextures.get(shortName);
+    }
+
+    /**
+     * @return the first texture path of a terrain texture entry: a path, a list of variants or an object with a path
+     */
+    private static @Nullable String texturePath(final @Nullable JsonElement textures) {
+        if (textures == null) {
+            return null;
+        } else if (textures.isJsonPrimitive()) {
+            return textures.getAsString();
+        } else if (textures instanceof final JsonArray variants && !variants.isEmpty()) {
+            return texturePath(variants.get(0));
+        } else if (textures instanceof final JsonObject object && object.has("path")) {
+            return object.get("path").getAsString();
+        }
+        return null;
     }
 
     private static void putAll(final Map<String, JsonObject> target, final @Nullable JsonObject source) {

@@ -31,6 +31,9 @@
   "icon": "assets/viafabricplus-bedrock/icon.png",
   "environment": "client",
   "entrypoints": {
+    "main": [
+      "com.viaversion.viafabricplus.bedrock.block.BedrockCustomBlocks"
+    ],
     "viafabricplus": [
       "com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock"
     ]

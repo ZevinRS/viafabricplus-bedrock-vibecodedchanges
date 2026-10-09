@@ -21,7 +21,6 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.core.connection;
 
-import com.viaversion.viafabricplus.bedrock.protocoltranslator.netty.BedrockPacketRecorder;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -30,23 +29,17 @@ import com.llamalad7.mixinextras.sugar.ref.LocalRef;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.friends.BedrockFriendsService;
 import com.viaversion.viafabricplus.bedrock.injection.access.IEventLoopGroupHolder;
+import com.viaversion.viafabricplus.bedrock.protocoltranslator.netty.BedrockPacketRecorder;
 import com.viaversion.viafabricplus.bedrock.protocoltranslator.netty.RakNetPingEncapsulationCodec;
-import com.viaversion.viafabricplus.bedrock.protocoltranslator.network.NetherNetInetSocketAddress;
+import com.viaversion.viafabricplus.bedrock.protocoltranslator.network.BedrockRakNetStatusProtocol;
 import com.viaversion.viafabricplus.bedrock.protocoltranslator.network.NetherNetHttpAddress;
+import com.viaversion.viafabricplus.bedrock.protocoltranslator.network.NetherNetInetSocketAddress;
 import com.viaversion.viafabricplus.bedrock.protocoltranslator.network.NetherNetJsonRpcAddress;
 import com.viaversion.viafabricplus.bedrock.protocoltranslator.network.NetherNetLanAddress;
-import com.viaversion.viafabricplus.bedrock.protocoltranslator.network.BedrockRakNetStatusProtocol;
+import com.viaversion.viafabricplus.bedrock.resourcepack.BedrockCustomBlockPack;
 import com.viaversion.viafabricplus.injection.access.core.IConnection;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
-import org.cloudburstmc.netty.channel.nethernet.NetherNetChannelFactory;
-import org.cloudburstmc.netty.channel.nethernet.config.NetherChannelOption;
-import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetClientSignaling;
-import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetDiscoverySignaling;
-import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetHTTPClientSignaling;
-import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetXboxRpcSignaling;
-import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetXboxSignaling;
-import org.cloudburstmc.netty.util.nethernet.OperatorIdentity;
 import io.netty.bootstrap.AbstractBootstrap;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -60,28 +53,47 @@ import io.netty.channel.kqueue.KQueueSocketChannel;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.io.IOException;
 import net.minecraft.network.Connection;
 import net.minecraft.network.HandlerNames;
 import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.common.ServerboundResourcePackPacket;
 import net.minecraft.server.network.EventLoopGroupHolder;
+import net.raphimc.minecraftauth.bedrock.BedrockAuthManager;
+import net.raphimc.minecraftauth.bedrock.model.MinecraftMultiplayerToken;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import net.raphimc.viabedrock.netty.PacketCodec;
 import net.raphimc.viabedrock.netty.raknet.MessageCodec;
-import net.raphimc.minecraftauth.bedrock.BedrockAuthManager;
-import net.raphimc.minecraftauth.bedrock.model.MinecraftMultiplayerToken;
+import org.cloudburstmc.netty.channel.nethernet.NetherNetChannelFactory;
+import org.cloudburstmc.netty.channel.nethernet.config.NetherChannelOption;
+import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetClientSignaling;
+import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetDiscoverySignaling;
+import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetHTTPClientSignaling;
+import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetXboxRpcSignaling;
+import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetXboxSignaling;
 import org.cloudburstmc.netty.channel.raknet.RakChannelFactory;
+import org.cloudburstmc.netty.util.nethernet.OperatorIdentity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = Connection.class, priority = 1001) // Apply after ViaFabricPlus' own connection mixin
 public abstract class MixinConnection extends SimpleChannelInboundHandler<Packet<?>> {
+
+    /**
+     * The pack of the server's block models is the client's own, see {@link BedrockCustomBlockPack}.
+     */
+    @Inject(method = "send(Lnet/minecraft/network/protocol/Packet;Lio/netty/channel/ChannelFutureListener;Z)V", at = @At("HEAD"), cancellable = true)
+    private void keepBlockPackFeedback(final Packet<?> packet, final ChannelFutureListener listener, final boolean flush, final CallbackInfo ci) {
+        if (packet instanceof final ServerboundResourcePackPacket resourcePack && resourcePack.id().equals(BedrockCustomBlockPack.PACK_ID)) {
+            ci.cancel();
+        }
+    }
 
     @Inject(method = "channelInactive", at = @At("HEAD"))
     private void leaveFriendWorld(final ChannelHandlerContext context, final CallbackInfo ci) {
