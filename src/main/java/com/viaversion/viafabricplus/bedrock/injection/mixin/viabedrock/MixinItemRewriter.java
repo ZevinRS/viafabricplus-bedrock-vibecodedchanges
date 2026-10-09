@@ -79,6 +79,10 @@ public abstract class MixinItemRewriter extends StoredObject {
 
     @Inject(method = "<init>", at = @At("TAIL"))
     private void addCustomBlockItems(final UserConnection user, final ItemEntry[] itemEntries, final CallbackInfo ci) {
+        // start_game makes an empty item list, which ViaBedrock only replaces with the server's while it stays empty
+        if (itemEntries.length == 0) {
+            return;
+        }
         final BlockStateRewriter blockStateRewriter = user.get(BlockStateRewriter.class);
         final List<String> customBlocks = ((IBlockStateRewriter) blockStateRewriter).viaFabricPlusBedrock$getCustomBlocks();
         for (int i = 0; i < customBlocks.size(); i++) {
