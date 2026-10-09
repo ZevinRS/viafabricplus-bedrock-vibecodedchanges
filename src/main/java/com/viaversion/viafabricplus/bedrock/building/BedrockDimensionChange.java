@@ -24,6 +24,7 @@ package com.viaversion.viafabricplus.bedrock.building;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.Options;
 import net.minecraft.client.player.ClientInput;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.phys.Vec2;
@@ -169,8 +170,11 @@ public final class BedrockDimensionChange {
         if (loading) {
             heldKeys = or(heldKeys, keys);
         } else {
+            // Toggled sprinting and sneaking stay on without the key being held, so they're never released
+            final Options options = Minecraft.getInstance().options;
             heldKeys = new Input(heldKeys.forward() && keys.forward(), heldKeys.backward() && keys.backward(), heldKeys.left() && keys.left(),
-                heldKeys.right() && keys.right(), heldKeys.jump() && keys.jump(), heldKeys.shift() && keys.shift(), heldKeys.sprint() && keys.sprint());
+                heldKeys.right() && keys.right(), heldKeys.jump() && keys.jump(), heldKeys.shift() && keys.shift() && !options.toggleCrouch().get(),
+                heldKeys.sprint() && keys.sprint() && !options.toggleSprint().get());
         }
         if (heldKeys.equals(Input.EMPTY)) {
             return null;
