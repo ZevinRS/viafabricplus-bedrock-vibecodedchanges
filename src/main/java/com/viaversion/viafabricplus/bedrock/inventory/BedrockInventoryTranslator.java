@@ -22,6 +22,7 @@
 package com.viaversion.viafabricplus.bedrock.inventory;
 
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
+import com.viaversion.viafabricplus.bedrock.building.BedrockPlacementTranslator;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.item.HashedItem;
 import com.viaversion.viaversion.api.minecraft.item.Item;
@@ -30,6 +31,7 @@ import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ServerboundPackets26_3;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,15 +42,24 @@ import net.raphimc.viabedrock.api.util.PacketFactory;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.ClientboundBedrockPackets;
 import net.raphimc.viabedrock.protocol.ServerboundBedrockPackets;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.ComplexInventoryTransaction_Type;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerID;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.InteractPacketPayload_Action;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.InventorySourceFlags;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.InventorySourceType;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.ContainerInput;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
+import net.raphimc.viabedrock.protocol.model.inventory.BedrockInventoryTransaction;
+import net.raphimc.viabedrock.protocol.model.inventory.InventoryActionData;
+import net.raphimc.viabedrock.protocol.model.inventory.InventorySource;
+import net.raphimc.viabedrock.protocol.model.inventory.InventoryTransactionData;
+import net.raphimc.viabedrock.protocol.rewriter.InventoryTransactionRewriter;
 import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 import net.raphimc.viabedrock.protocol.storage.EntityTracker;
+import net.raphimc.viabedrock.protocol.storage.GameSessionStorage;
 import net.raphimc.viabedrock.protocol.storage.InventoryTracker;
 import net.raphimc.viabedrock.protocol.types.BedrockTypes;
 
@@ -153,6 +164,9 @@ public final class BedrockInventoryTranslator {
         if (changes.isEmpty()) {
             return true;
         }
+        if (!user.get(GameSessionStorage.class).isInventoryServerAuthoritative()) {
+            return sendTransaction(user, changes);
+        }
 
         final List<Move> moves = new ArrayList<>();
         final List<Change> typeChanges = changes.stream().filter(Change::typeChanged).toList();
@@ -215,6 +229,126 @@ public final class BedrockInventoryTranslator {
 
         sendMoves(user, moves);
         return true;
+    }
+
+    /**
+     * Servers that leave the inventory to the client, like The Hive, get one transaction per click that lists every
+     * changed slot with its old and new item, as the Bedrock client sends it there: sorted by window, the cursor being
+     * slot 0 of window 124, and items thrown out of the inventory first. The server doesn't answer it.
+     */
+    private static boolean sendTransaction(final UserConnection user, final List<Change> changes) {
+        // The Bedrock items moved into slots are the ones that left other slots
+        final Map<Integer, BedrockItem> movedItems = new HashMap<>();
+        final Map<Integer, Integer> leftItems = new LinkedHashMap<>(); // removed minus added items of each Java item
+        for (final Change change : changes) {
+            if (change.oldCount > 0) {
+                movedItems.putIfAbsent(change.oldId, change.ref.item());
+                leftItems.merge(change.oldId, change.oldCount, Integer::sum);
+            }
+            if (change.newCount > 0) {
+                leftItems.merge(change.newId, -change.newCount, Integer::sum);
+            }
+        }
+
+        final List<InventoryActionData> actions = new ArrayList<>();
+        for (final Map.Entry<Integer, Integer> entry : leftItems.entrySet()) {
+            if (entry.getValue() < 0) { // Items appeared out of nowhere
+                return false;
+            } else if (entry.getValue() > 0) {
+                final BedrockItem dropped = movedItems.get(entry.getKey()).copy();
+                dropped.setAmount(entry.getValue());
+                actions.add(new InventoryActionData(new InventorySource(InventorySourceType.World_Interaction, ContainerID.CONTAINER_ID_NONE.getValue(), InventorySourceFlags.No_Flag),
+                    0, BedrockItem.empty(), dropped));
+            }
+        }
+
+        final List<Change> sorted = new ArrayList<>(changes);
+        sorted.sort(Comparator.<Change>comparingInt(change -> windowId(change.ref)).thenComparingInt(change -> legacySlot(change.ref)));
+        final Map<BedrockInventoryState.SlotKey, BedrockItem> newItems = new LinkedHashMap<>();
+        for (final Change change : sorted) {
+            final BedrockItem oldItem = change.ref.item();
+            BedrockItem newItem = BedrockItem.empty();
+            if (change.newCount > 0) {
+                newItem = (change.oldCount > 0 && change.oldId == change.newId ? oldItem : movedItems.get(change.newId)).copy();
+                newItem.setAmount(change.newCount);
+            }
+            actions.add(new InventoryActionData(new InventorySource(InventorySourceType.Container_Inventory, windowId(change.ref), InventorySourceFlags.No_Flag),
+                legacySlot(change.ref), oldItem, newItem));
+            newItems.put(change.ref.key(), newItem);
+        }
+        sendNormalTransaction(user, actions);
+
+        for (final Map.Entry<BedrockInventoryState.SlotKey, BedrockItem> entry : newItems.entrySet()) {
+            setItem(user, entry.getKey().container(), entry.getKey().index(), entry.getValue());
+        }
+        return true;
+    }
+
+    /**
+     * Throwing the held item away with the drop key on servers that leave the inventory to the client. ViaBedrock sends
+     * the same transaction, but keeps the item in the tracked inventory.
+     *
+     * @return whether the drop was handled
+     */
+    public static boolean dropHeldItem(final UserConnection user, final boolean wholeStack) {
+        if (user.get(GameSessionStorage.class).isInventoryServerAuthoritative()) {
+            return false;
+        }
+        final InventoryContainer inventory = user.get(InventoryTracker.class).getInventoryContainer();
+        final byte slot = inventory.getSelectedHotbarSlot();
+        final BedrockItem heldItem = inventory.getSelectedHotbarItem().copy();
+        if (heldItem.isEmpty()) {
+            return true;
+        }
+        final BedrockItem dropped = heldItem.copy();
+        BedrockItem remaining = BedrockItem.empty();
+        if (!wholeStack && heldItem.amount() > 1) {
+            dropped.setAmount(1);
+            remaining = heldItem.copy();
+            remaining.setAmount(heldItem.amount() - 1);
+        }
+        sendNormalTransaction(user, List.of(
+            new InventoryActionData(new InventorySource(InventorySourceType.World_Interaction, ContainerID.CONTAINER_ID_NONE.getValue(), InventorySourceFlags.No_Flag), 0, BedrockItem.empty(), dropped),
+            new InventoryActionData(new InventorySource(InventorySourceType.Container_Inventory, ContainerID.CONTAINER_ID_INVENTORY.getValue(), InventorySourceFlags.No_Flag), slot, heldItem, remaining)
+        ));
+        setItem(user, inventory, slot, remaining);
+        return true;
+    }
+
+    private static void sendNormalTransaction(final UserConnection user, final List<InventoryActionData> actions) {
+        final PacketWrapper inventoryTransaction = PacketWrapper.create(ServerboundBedrockPackets.INVENTORY_TRANSACTION, user);
+        inventoryTransaction.write(user.get(InventoryTransactionRewriter.class).getInventoryTransactionType(),
+            new BedrockInventoryTransaction(0, null, actions, ComplexInventoryTransaction_Type.NormalTransaction, new InventoryTransactionData.NormalTransactionData()));
+        inventoryTransaction.sendToServer(BedrockProtocol.class);
+    }
+
+    /**
+     * Updates a tracked slot. Like the Bedrock client, the held item is only sent again when it became another item,
+     * not when only its count changed.
+     */
+    private static void setItem(final UserConnection user, final Container container, final int index, final BedrockItem item) {
+        if (container instanceof final InventoryContainer inventory && index == inventory.getSelectedHotbarSlot()
+            && !item.isEmpty() && !inventory.getItem(index).isEmpty() && !item.isDifferent(inventory.getItem(index))) {
+            BedrockPlacementTranslator.state(user).equip(index, item);
+        }
+        container.setItem(index, item);
+    }
+
+    /**
+     * The window of a slot in inventory transactions.
+     */
+    private static int windowId(final SlotRef ref) {
+        return switch (ref.name) {
+            case HotbarContainer, InventoryContainer -> ContainerID.CONTAINER_ID_INVENTORY.getValue();
+            case ArmorContainer -> ContainerID.CONTAINER_ID_ARMOR.getValue();
+            case OffhandContainer -> ContainerID.CONTAINER_ID_OFFHAND.getValue();
+            case CursorContainer, CraftingInputContainer -> ContainerID.CONTAINER_ID_PLAYER_ONLY_UI.getValue();
+            default -> ref.container.containerId();
+        };
+    }
+
+    private static int legacySlot(final SlotRef ref) {
+        return ref.name == ContainerEnumName.OffhandContainer ? 0 : ref.bedrockSlot;
     }
 
     private static void sendMoves(final UserConnection user, final List<Move> moves) {

@@ -73,6 +73,7 @@
     "viabedrock.MixinDimensionChangeAck",
     "viabedrock.MixinDimensionChangePackets",
     "viabedrock.MixinGlyphSheetResourceRewriter",
+    "viabedrock.MixinInteractionPackets",
     "viabedrock.MixinInventoryContainer",
     "viabedrock.MixinJoinPackets",
     "viabedrock.MixinLivingEntity",
