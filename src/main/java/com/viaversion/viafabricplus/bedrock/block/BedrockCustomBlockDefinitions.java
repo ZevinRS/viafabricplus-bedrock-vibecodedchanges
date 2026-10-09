@@ -27,6 +27,7 @@ import com.viaversion.nbt.tag.ListTag;
 import com.viaversion.nbt.tag.NumberTag;
 import com.viaversion.nbt.tag.StringTag;
 import com.viaversion.nbt.tag.Tag;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -45,6 +46,7 @@ import team.unnamed.mocha.runtime.standard.MochaMath;
  */
 public final class BedrockCustomBlockDefinitions {
 
+    private static final Pattern STRING_LITERAL = Pattern.compile("'[^']*'");
     private static final Pattern STATE_QUERY = Pattern.compile("(?:query|q)\\.block_(?:property|state)\\(\\s*'([^']+)'\\s*\\)");
     private static final Scope SCOPE = Scope.create();
     private static final String FULL_BLOCK_GEOMETRY = "minecraft:geometry.full_block";
@@ -176,6 +178,21 @@ public final class BedrockCustomBlockDefinitions {
     }
 
     /**
+     * The MoLang engine compares strings as numbers, so 'top' == 'bottom' held and every permutation of a slab's halves
+     * applied. Gives every distinct string a number of its own instead.
+     */
+    private static String numberStrings(final String expression) {
+        final Map<String, Integer> numbers = new HashMap<>();
+        final Matcher matcher = STRING_LITERAL.matcher(expression);
+        final StringBuilder numbered = new StringBuilder();
+        while (matcher.find()) {
+            matcher.appendReplacement(numbered, Integer.toString(numbers.computeIfAbsent(matcher.group(), string -> 1000000 + numbers.size())));
+        }
+        matcher.appendTail(numbered);
+        return numbered.toString();
+    }
+
+    /**
      * @return whether a permutation's condition holds for the state, with its block properties put in
      */
     private static boolean holds(final String condition, final CompoundTag states) {
@@ -200,7 +217,7 @@ public final class BedrockCustomBlockDefinitions {
         }
         matcher.appendTail(expression);
         try {
-            return MoLangEngine.eval(SCOPE, expression.toString()).getAsBoolean();
+            return MoLangEngine.eval(SCOPE, numberStrings(expression.toString())).getAsBoolean();
         } catch (final Throwable e) {
             return false;
         }

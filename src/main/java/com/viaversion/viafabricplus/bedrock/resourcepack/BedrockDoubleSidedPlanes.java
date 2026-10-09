@@ -77,6 +77,54 @@ public final class BedrockDoubleSidedPlanes {
         }
     }
 
+    /**
+     * Bedrock draws blocks with see-through materials from both sides, but the flat parts of their geometries, like
+     * the planes of flowers, only have the face on one side. Adds the face on the other side, with the texture as it's
+     * seen from behind.
+     */
+    public static void addBackFaces(final JsonObject model) {
+        if (!(model.get("elements") instanceof final JsonArray elements)) {
+            return;
+        }
+        for (final JsonElement element : elements) {
+            if (!(element instanceof final JsonObject object) || !(object.get("from") instanceof final JsonArray from) || !(object.get("to") instanceof final JsonArray to)
+                || !(object.get("faces") instanceof final JsonObject faces)) {
+                continue;
+            }
+            for (int axis = 0; axis < 3; axis++) {
+                if (from.get(axis).getAsFloat() != to.get(axis).getAsFloat()) {
+                    continue;
+                }
+                final String first = FACE_PAIRS[axis][0];
+                final String second = FACE_PAIRS[axis][1];
+                if (faces.get(first) instanceof final JsonObject face && !faces.has(second)) {
+                    faces.add(second, back(face, axis));
+                } else if (faces.get(second) instanceof final JsonObject face && !faces.has(first)) {
+                    faces.add(first, back(face, axis));
+                }
+            }
+        }
+    }
+
+    private static JsonObject back(final JsonObject face, final int axis) {
+        final JsonObject back = face.deepCopy();
+        back.remove("cullface");
+        if (face.get("uv") instanceof final JsonArray uv && uv.size() == 4) {
+            // The texture of up and down runs the other way along z, of the sides the other way along their width
+            back.add("uv", axis == 1 ? flipped(uv) : mirrored(uv));
+        }
+        return back;
+    }
+
+    private static JsonArray flipped(final JsonArray uv) {
+        final JsonArray flipped = new JsonArray();
+        flipped.add(uv.get(0));
+        flipped.add(uv.get(3));
+        flipped.add(uv.get(2));
+        flipped.add(uv.get(1));
+        return flipped;
+    }
+
     private static boolean hasFlatParts(final JsonArray elements) {
         for (final JsonElement element : elements) {
             if (element instanceof final JsonObject object && object.get("from") instanceof final JsonArray from && object.get("to") instanceof final JsonArray to) {

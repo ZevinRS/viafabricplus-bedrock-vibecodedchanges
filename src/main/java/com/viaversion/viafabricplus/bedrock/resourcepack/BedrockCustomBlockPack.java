@@ -24,6 +24,8 @@ package com.viaversion.viafabricplus.bedrock.resourcepack;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.block.BedrockCustomBlockDefinition;
 import com.viaversion.viafabricplus.bedrock.block.BedrockCustomBlocks;
+import com.viaversion.viaversion.libs.gson.JsonArray;
+import com.viaversion.viaversion.libs.gson.JsonElement;
 import com.viaversion.viaversion.libs.gson.JsonObject;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -118,6 +120,10 @@ public final class BedrockCustomBlockPack {
                 blockModel.remove("display");
                 blockModel.addProperty("parent", "minecraft:block/block");
                 blockModel.getAsJsonObject("textures").addProperty("particle", faceTextures.get(Direction.NORTH));
+                removeUntexturedFaces(blockModel);
+                if (isDoubleSided(definition.renderMethod())) {
+                    BedrockDoubleSidedPlanes.addBackFaces(blockModel);
+                }
             }
         }
         if (blockModel == null) {
@@ -155,6 +161,31 @@ public final class BedrockCustomBlockPack {
         final String nameKey = "tile." + definition.name() + ".name";
         final String name = packs.getTexts().get(nameKey);
         lang.addProperty(block.getDescriptionId(), name.equals(nameKey) ? definition.name() : name);
+    }
+
+    /**
+     * Bedrock's alpha_test and blend materials draw faces from both sides, their *_single_sided forms and opaque don't.
+     */
+    private static boolean isDoubleSided(final @Nullable String renderMethod) {
+        return renderMethod != null && !renderMethod.equals("opaque") && !renderMethod.endsWith("single_sided");
+    }
+
+    /**
+     * Faces the geometry has no texture area for come out referencing a texture the model doesn't have, which Java
+     * draws as the missing texture.
+     */
+    private static void removeUntexturedFaces(final JsonObject model) {
+        final JsonObject textures = model.getAsJsonObject("textures");
+        if (!(model.get("elements") instanceof final JsonArray elements)) {
+            return;
+        }
+        for (final JsonElement element : elements) {
+            if (element instanceof final JsonObject object && object.get("faces") instanceof final JsonObject faces) {
+                faces.entrySet().removeIf(face -> !(face.getValue() instanceof final JsonObject faceObject)
+                    || !(faceObject.get("texture") instanceof final JsonElement texture)
+                    || !textures.has(texture.getAsString().substring(texture.getAsString().startsWith("#") ? 1 : 0)));
+            }
+        }
     }
 
     /**
