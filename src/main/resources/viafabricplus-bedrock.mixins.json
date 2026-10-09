@@ -76,6 +76,7 @@
     "viabedrock.MixinGlyphSheetResourceRewriter",
     "viabedrock.MixinInteractionPackets",
     "viabedrock.MixinInventoryContainer",
+    "viabedrock.MixinInventoryPackets",
     "viabedrock.MixinJoinPackets",
     "viabedrock.MixinLivingEntity",
     "viabedrock.MixinOffhandContainer",
