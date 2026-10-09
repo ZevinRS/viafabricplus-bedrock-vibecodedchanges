@@ -24,12 +24,8 @@ package com.viaversion.viafabricplus.bedrock.resourcepack;
 import com.viaversion.viaversion.libs.gson.JsonArray;
 import com.viaversion.viaversion.libs.gson.JsonElement;
 import com.viaversion.viaversion.libs.gson.JsonObject;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
-import java.util.WeakHashMap;
-import net.raphimc.viabedrock.api.resourcepack.ResourcePack;
 import net.raphimc.viabedrock.protocol.storage.ResourcePackStorage;
 
 /**
@@ -44,58 +40,24 @@ public final class BedrockCameraFacing {
     public static final byte HORIZONTAL = 2;
     public static final byte CENTER = 3;
 
-    // The billboard mode of each entity identifier, for each pack stack
-    private static final Map<ResourcePackStorage, Map<String, Byte>> MODES = Collections.synchronizedMap(new WeakHashMap<>());
-
     private BedrockCameraFacing() {
     }
 
     public static byte billboard(final ResourcePackStorage storage, final String identifier) {
-        return MODES.computeIfAbsent(storage, BedrockCameraFacing::load).getOrDefault(identifier, FIXED);
-    }
-
-    private static Map<String, Byte> load(final ResourcePackStorage storage) {
-        final Map<String, Byte> animationModes = new HashMap<>();
-        final Map<String, Map<String, String>> entityAnimations = new HashMap<>();
-        for (final ResourcePack pack : storage.getPackStackBottomToTop()) {
-            for (final String path : pack.content().getFilesDeep("animations/", ".json")) {
-                final JsonObject animations = object(read(pack, path), "animations");
-                if (animations == null) {
-                    continue;
-                }
-                for (final Map.Entry<String, JsonElement> animation : animations.entrySet()) {
-                    animationModes.put(animation.getKey(), mode(object(animation.getValue(), "bones")));
-                }
-            }
-            for (final String path : pack.content().getFilesDeep("entity/", ".json")) {
-                final JsonObject description = object(object(read(pack, path), "minecraft:client_entity"), "description");
-                if (description == null || !description.has("identifier")) {
-                    continue;
-                }
-                final Map<String, String> animations = new HashMap<>();
-                final JsonObject animationMap = object(description, "animations");
-                if (animationMap != null) {
-                    for (final Map.Entry<String, JsonElement> entry : animationMap.entrySet()) {
-                        if (entry.getValue().isJsonPrimitive()) {
-                            animations.put(entry.getKey(), entry.getValue().getAsString());
-                        }
-                    }
-                }
-                entityAnimations.put(description.get("identifier").getAsString(), animations);
-            }
+        final BedrockPackIndex index = BedrockPackIndex.of(storage);
+        final JsonObject animations = BedrockPackIndex.object(index.entityDescriptions().get(identifier), "animations");
+        if (animations == null) {
+            return FIXED;
         }
-
-        final Map<String, Byte> modes = new HashMap<>();
-        for (final Map.Entry<String, Map<String, String>> entity : entityAnimations.entrySet()) {
-            for (final String animation : entity.getValue().values()) {
-                final byte mode = animationModes.getOrDefault(animation, FIXED);
+        for (final Map.Entry<String, JsonElement> entry : animations.entrySet()) {
+            if (entry.getValue().isJsonPrimitive()) {
+                final byte mode = mode(BedrockPackIndex.object(index.animation(entry.getValue().getAsString()), "bones"));
                 if (mode != FIXED) {
-                    modes.put(entity.getKey(), mode);
-                    break;
+                    return mode;
                 }
             }
         }
-        return modes;
+        return FIXED;
     }
 
     /**
@@ -123,21 +85,9 @@ public final class BedrockCameraFacing {
         return FIXED;
     }
 
-    private static boolean facesCamera(final JsonElement expression, final int axis) {
+    static boolean facesCamera(final JsonElement expression, final int axis) {
         return expression.isJsonPrimitive() && expression.getAsJsonPrimitive().isString()
             && expression.getAsString().toLowerCase(Locale.ROOT).replace(" ", "").contains("rotation_to_camera(" + axis + ")");
-    }
-
-    private static JsonObject read(final ResourcePack pack, final String path) {
-        try {
-            return pack.content().getJson(path);
-        } catch (final Exception e) { // Packs often have files that aren't valid JSON
-            return null;
-        }
-    }
-
-    private static JsonObject object(final JsonElement element, final String key) {
-        return element != null && element.isJsonObject() && element.getAsJsonObject().get(key) instanceof final JsonObject object ? object : null;
     }
 
 }

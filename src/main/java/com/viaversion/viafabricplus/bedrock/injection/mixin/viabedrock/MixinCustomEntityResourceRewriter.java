@@ -24,19 +24,39 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
+import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
+import com.viaversion.viafabricplus.bedrock.resourcepack.BedrockEntityPoses;
 import com.viaversion.viafabricplus.bedrock.resourcepack.BedrockDoubleSidedPlanes;
 import com.viaversion.viaversion.libs.gson.JsonObject;
 import java.util.Map;
 import net.raphimc.viabedrock.api.resourcepack.ResourcePack;
 import net.raphimc.viabedrock.api.resourcepack.content.Content;
+import net.raphimc.viabedrock.api.resourcepack.definition.EntityDefinitions;
 import net.raphimc.viabedrock.protocol.rewriter.resourcepack.CustomEntityResourceRewriter;
 import net.raphimc.viabedrock.protocol.storage.ResourcePackStorage;
+import org.cube.converter.converter.enums.RotationType;
+import org.cube.converter.model.impl.bedrock.BedrockGeometryModel;
 import org.cube.converter.model.impl.java.JavaItemModel;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
 @Mixin(value = CustomEntityResourceRewriter.class, remap = false)
 public abstract class MixinCustomEntityResourceRewriter {
+
+    /**
+     * See {@link BedrockEntityPoses}.
+     */
+    @WrapOperation(method = "handleEntityDefinition", at = @At(value = "INVOKE", target = "Lorg/cube/converter/model/impl/bedrock/BedrockGeometryModel;toJavaItemModel(Ljava/lang/String;Lorg/cube/converter/converter/enums/RotationType;)Lorg/cube/converter/model/impl/java/JavaItemModel;"))
+    private JavaItemModel poseModel(final BedrockGeometryModel geometry, final String texture, final RotationType rotationType, final Operation<JavaItemModel> original,
+                                    @Local(argsOnly = true) final ResourcePackStorage resourcePackStorage, @Local(argsOnly = true) final EntityDefinitions.EntityDefinition entityDefinition) {
+        BedrockGeometryModel posed = geometry;
+        try {
+            posed = BedrockEntityPoses.pose(resourcePackStorage, entityDefinition.identifier(), geometry);
+        } catch (final Exception e) {
+            ViaFabricPlusBedrock.impl().logger().error("Failed to pose the model of {}", entityDefinition.identifier(), e);
+        }
+        return original.call(posed, texture, rotationType);
+    }
 
     /**
      * See {@link BedrockDoubleSidedPlanes}.
