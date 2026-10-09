@@ -45,6 +45,7 @@
     "features.block.MixinBlockStateBase",
     "features.block.MixinMultiPlayerGameMode",
     "features.entity.MixinEntityRenderer",
+    "features.entity.MixinEntityRenderers",
     "features.entity.MixinEntityRenderState",
     "features.entity.MixinLivingEntityRenderer",
     "features.block.MixinSeaPickleBlock",

@@ -21,6 +21,8 @@
 
 package com.viaversion.viafabricplus.bedrock.resourcepack;
 
+import com.viaversion.viafabricplus.bedrock.render.BedrockAnimation;
+import com.viaversion.viafabricplus.bedrock.render.BedrockGeometry;
 import com.viaversion.viaversion.libs.gson.JsonArray;
 import com.viaversion.viaversion.libs.gson.JsonElement;
 import com.viaversion.viaversion.libs.gson.JsonObject;
@@ -28,7 +30,9 @@ import com.viaversion.viaversion.util.Key;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import net.raphimc.viabedrock.api.resourcepack.ResourcePack;
 import net.raphimc.viabedrock.protocol.storage.ResourcePackStorage;
 import org.cube.converter.model.impl.bedrock.BedrockGeometryModel;
@@ -48,9 +52,14 @@ public final class BedrockPackIndex {
     private final Map<String, JsonObject> animations = new HashMap<>();
     private final Map<String, JsonObject> animationControllers = new HashMap<>();
     private final Map<String, JsonObject> blocks = new HashMap<>();
+    private final Map<String, JsonObject> renderControllers = new HashMap<>();
+    // Materials of the packs by name, each the name of the material it's based on and its own changes
+    private final Map<String, Map.Entry<String, JsonObject>> materials = new HashMap<>();
     private final Map<String, String> terrainTextures = new HashMap<>();
     private final ResourcePackStorage storage;
     private Map<String, BedrockGeometryModel> geometries;
+    private Map<String, BedrockGeometry> renderGeometries;
+    private final Map<String, Optional<BedrockAnimation>> parsedAnimations = new ConcurrentHashMap<>();
 
     private BedrockPackIndex(final ResourcePackStorage storage) {
         this.storage = storage;
@@ -66,6 +75,20 @@ public final class BedrockPackIndex {
             }
             for (final String path : pack.content().getFilesDeep("animation_controllers/", ".json")) {
                 putAll(this.animationControllers, object(read(pack, path), "animation_controllers"));
+            }
+            for (final String path : pack.content().getFilesDeep("render_controllers/", ".json")) {
+                putAll(this.renderControllers, object(read(pack, path), "render_controllers"));
+            }
+            for (final String path : pack.content().getFilesDeep("materials/", ".material")) {
+                final JsonObject materials = object(read(pack, path), "materials");
+                if (materials != null) {
+                    for (final Map.Entry<String, JsonElement> material : materials.entrySet()) {
+                        if (material.getValue() instanceof final JsonObject changes) {
+                            final String[] names = material.getKey().split(":", 2);
+                            this.materials.put(names[0], Map.entry(names.length > 1 ? names[1] : "", changes));
+                        }
+                    }
+                }
             }
             final JsonObject blocks = read(pack, "blocks.json");
             if (blocks != null) {
@@ -101,6 +124,17 @@ public final class BedrockPackIndex {
 
     public @Nullable JsonObject animationController(final String identifier) {
         return this.animationControllers.get(identifier);
+    }
+
+    public @Nullable JsonObject renderController(final String identifier) {
+        return this.renderControllers.get(identifier);
+    }
+
+    /**
+     * @return the material a pack defines: the name of the material it's based on and its own changes
+     */
+    public Map.@Nullable Entry<String, JsonObject> material(final String name) {
+        return this.materials.get(name);
     }
 
     /**
@@ -156,6 +190,38 @@ public final class BedrockPackIndex {
     }
 
     /**
+     * @return a geometry of any model file as the file has it, read on the first call
+     */
+    public synchronized @Nullable BedrockGeometry renderGeometry(final String identifier) {
+        if (this.renderGeometries == null) {
+            this.renderGeometries = new HashMap<>();
+            for (final ResourcePack pack : this.storage.getPackStackBottomToTop()) {
+                for (final String path : pack.content().getFilesDeep("models/", ".json")) {
+                    final JsonObject file = read(pack, path);
+                    if (file != null) {
+                        try {
+                            this.renderGeometries.putAll(BedrockGeometry.parseFile(file));
+                        } catch (final RuntimeException ignored) { // ViaBedrock already warns about the ones it can't parse
+                        }
+                    }
+                }
+            }
+        }
+        return this.renderGeometries.get(identifier);
+    }
+
+    public @Nullable BedrockAnimation parsedAnimation(final String identifier) {
+        return this.parsedAnimations.computeIfAbsent(identifier, id -> {
+            final JsonObject animation = this.animations.get(id);
+            try {
+                return Optional.ofNullable(animation != null ? BedrockAnimation.parse(animation) : null);
+            } catch (final RuntimeException e) {
+                return Optional.empty();
+            }
+        }).orElse(null);
+    }
+
+    /**
      * @return the path of a block texture's short name in terrain_texture.json, without file extension
      */
     public @Nullable String terrainTexture(final String shortName) {
@@ -196,7 +262,7 @@ public final class BedrockPackIndex {
         }
     }
 
-    static @Nullable JsonObject object(final @Nullable JsonElement element, final String key) {
+    public static @Nullable JsonObject object(final @Nullable JsonElement element, final String key) {
         return element != null && element.isJsonObject() && element.getAsJsonObject().get(key) instanceof final JsonObject object ? object : null;
     }
 

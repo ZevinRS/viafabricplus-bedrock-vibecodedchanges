@@ -26,6 +26,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.viaversion.viafabricplus.bedrock.block.BedrockCustomBlockMapping;
 import com.viaversion.viafabricplus.bedrock.injection.access.IBlockStateRewriter;
+import com.viaversion.viafabricplus.bedrock.render.BedrockEntityModels;
 import com.viaversion.viafabricplus.bedrock.resourcepack.BedrockNameTags;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.libs.fastutil.ints.IntIntImmutablePair;
@@ -43,12 +44,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class MixinJoinPackets {
 
     /**
-     * Forgets the name tags of the last server before its entities are translated, on the same thread. Clearing them
-     * when Java handled the login lost the name tags of the entities the server spawned while the join was loading.
+     * Forgets the name tags and models of the last server's entities before the new server's are translated, on the
+     * same thread. Clearing them when Java handled the login lost the name tags of the entities the server spawned while
+     * the join was loading.
      */
     @Inject(method = "lambda$register$7", at = @At("HEAD"))
     private static void forgetNameTags(final PacketWrapper wrapper, final CallbackInfo ci) {
         BedrockNameTags.clear();
+        BedrockEntityModels.clear();
     }
 
     /**

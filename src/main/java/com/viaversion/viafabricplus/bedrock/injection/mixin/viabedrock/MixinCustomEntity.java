@@ -23,6 +23,7 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.viaversion.viafabricplus.bedrock.render.BedrockEntityModels;
 import com.viaversion.viafabricplus.bedrock.resourcepack.BedrockCameraFacing;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.entities.EntityTypes26_3;
@@ -65,6 +66,10 @@ public abstract class MixinCustomEntity extends Entity {
     private boolean spawned;
 
     @Shadow
+    @Final
+    private List<CustomEntity.EvaluatedModel> models;
+
+    @Shadow
     private void spawn() {
     }
 
@@ -85,9 +90,19 @@ public abstract class MixinCustomEntity extends Entity {
         return scale != null && scale.value() instanceof final Float value && value > 0F ? value : 1F;
     }
 
-    @Inject(method = "spawn", at = @At("HEAD"))
-    private void rememberScale(final CallbackInfo ci) {
+    @Inject(method = "spawn", at = @At("HEAD"), cancellable = true)
+    private void drawBedrockModel(final CallbackInfo ci) {
         this.viaFabricPlusBedrock$spawnedScale = this.viaFabricPlusBedrock$scale();
+        final ResourcePackStorage packs = this.user.get(ResourcePackStorage.class);
+        if (packs != null && BedrockEntityModels.spawn(packs, (CustomEntity) (Object) this, this.entityDefinition.identifier(), this.models)) {
+            this.spawned = true;
+            ci.cancel();
+        }
+    }
+
+    @Inject(method = "despawn", at = @At("HEAD"))
+    private void forgetBedrockModel(final CallbackInfo ci) {
+        BedrockEntityModels.remove(this.javaId());
     }
 
     @ModifyVariable(method = "spawn", at = @At("STORE"), ordinal = 0)
