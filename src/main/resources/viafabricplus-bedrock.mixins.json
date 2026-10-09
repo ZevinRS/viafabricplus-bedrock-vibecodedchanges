@@ -54,6 +54,7 @@
     "features.misc.MixinInventoryScreen",
     "features.misc.MixinMinecraft",
     "features.misc.MixinPlayer",
+    "features.movement.MixinClientCommonPacketListenerImpl",
     "features.movement.MixinClientPacketListener",
     "features.movement.MixinEntity",
     "features.movement.MixinEntityFluidInteraction",

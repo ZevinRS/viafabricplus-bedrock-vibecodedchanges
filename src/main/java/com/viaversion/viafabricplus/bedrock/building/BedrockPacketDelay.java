@@ -46,6 +46,8 @@ public final class BedrockPacketDelay {
     public static final int ATTRIBUTE_MOVES = 3;
     public static final int MOTION_MOVES = 2;
     public static final int ENTITY_DATA_MOVES = 2;
+    // The answer to the server's latency check, which the Bedrock client sends when it handles the packets
+    public static final int LATENCY_MOVES = 2;
 
     private static final Deque<Pending<?>> PENDING = new ArrayDeque<>();
     private static boolean applying;
@@ -60,7 +62,19 @@ public final class BedrockPacketDelay {
      */
     public static <T extends Packet<?>> boolean hold(final T packet, final int entityId, final int moves, final BiConsumer<ClientPacketListener, T> handler) {
         final Minecraft minecraft = Minecraft.getInstance();
-        if (applying || minecraft.player == null || entityId != minecraft.player.getId()) {
+        if (minecraft.player == null || entityId != minecraft.player.getId()) {
+            return false;
+        }
+        return hold(packet, moves, handler);
+    }
+
+    /**
+     * Holds back a packet that isn't about an entity.
+     *
+     * @return whether the packet was held back
+     */
+    public static <T extends Packet<?>> boolean hold(final T packet, final int moves, final BiConsumer<ClientPacketListener, T> handler) {
+        if (applying || Minecraft.getInstance().player == null) {
             return false;
         }
         // Applied at the end of the tick that sends the input before the move it is used for
