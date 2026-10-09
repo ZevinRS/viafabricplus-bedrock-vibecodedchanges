@@ -179,13 +179,19 @@ public final class BedrockCustomBlockPack {
         if (!(model.get("elements") instanceof final JsonArray elements)) {
             return;
         }
+        final JsonArray textured = new JsonArray();
         for (final JsonElement element : elements) {
             if (element instanceof final JsonObject object && object.get("faces") instanceof final JsonObject faces) {
                 faces.entrySet().removeIf(face -> !(face.getValue() instanceof final JsonObject faceObject)
                     || !(faceObject.get("texture") instanceof final JsonElement texture)
                     || !textures.has(texture.getAsString().substring(texture.getAsString().startsWith("#") ? 1 : 0)));
+                if (!faces.isEmpty()) { // Java doesn't load parts without faces
+                    textured.add(object);
+                }
             }
         }
+        model.add("elements", textured);
+        model.remove("groups"); // They refer to parts by index
     }
 
     /**
