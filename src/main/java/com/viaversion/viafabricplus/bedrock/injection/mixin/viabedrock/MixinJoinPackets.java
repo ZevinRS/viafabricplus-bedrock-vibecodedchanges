@@ -26,6 +26,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.viaversion.viafabricplus.bedrock.block.BedrockCustomBlockMapping;
 import com.viaversion.viafabricplus.bedrock.injection.access.IBlockStateRewriter;
+import com.viaversion.viafabricplus.bedrock.resourcepack.BedrockNameTags;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.libs.fastutil.ints.IntIntImmutablePair;
 import com.viaversion.viaversion.libs.fastutil.ints.IntIntPair;
@@ -35,9 +36,20 @@ import net.raphimc.viabedrock.protocol.rewriter.BlockStateRewriter;
 import net.raphimc.viabedrock.protocol.storage.GameSessionStorage;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = JoinPackets.class, remap = false)
 public abstract class MixinJoinPackets {
+
+    /**
+     * Forgets the name tags of the last server before its entities are translated, on the same thread. Clearing them
+     * when Java handled the login lost the name tags of the entities the server spawned while the join was loading.
+     */
+    @Inject(method = "lambda$register$7", at = @At("HEAD"))
+    private static void forgetNameTags(final PacketWrapper wrapper, final CallbackInfo ci) {
+        BedrockNameTags.clear();
+    }
 
     /**
      * A dimension definition holds its lowest Y and then its height, not its highest and lowest Y as ViaBedrock read
