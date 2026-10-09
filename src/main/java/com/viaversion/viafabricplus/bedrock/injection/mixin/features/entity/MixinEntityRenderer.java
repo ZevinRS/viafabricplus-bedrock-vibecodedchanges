@@ -74,8 +74,10 @@ public abstract class MixinEntityRenderer<T extends Entity, S extends EntityRend
             return;
         }
         state.nameTag = nameTag.lines().getFirst();
-        state.nameTagAttachment = nameTag.height() >= 0F ? new Vec3(0, nameTag.height(), 0)
+        // Bedrock scales the bounding box with the entity, like The Hive's costume NPCs, whose box height is the unscaled one
+        final Vec3 attachment = nameTag.height() >= 0F ? new Vec3(0, nameTag.height(), 0)
             : entity.getAttachments().getNullable(EntityAttachment.NAME_TAG, 0, entity.getYRot(partialTicks));
+        state.nameTagAttachment = attachment != null ? attachment.scale(nameTag.scale()) : null;
         bedrockState.viaFabricPlusBedrock$setNameLines(nameTag.lines());
     }
 
