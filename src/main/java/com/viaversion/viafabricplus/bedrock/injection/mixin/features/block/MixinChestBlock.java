@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.block;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
@@ -32,7 +33,6 @@ import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
-import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -65,7 +65,7 @@ public abstract class MixinChestBlock {
 
     @Inject(method = "getShape", at = @At("HEAD"), cancellable = true)
     private void changeOutlineShape(final BlockState state, final BlockGetter level, final BlockPos pos, final CollisionContext context, final CallbackInfoReturnable<VoxelShape> cir) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (Features.COLLISION_SHAPES.isActive()) {
             cir.setReturnValue(switch (state.getValue(ChestBlock.TYPE)) {
                 case SINGLE -> viaFabricPlusBedrock$single_shape;
                 case LEFT, RIGHT -> viaFabricPlusBedrock$double_shapes.get(ChestBlock.getConnectedDirection(state));
@@ -76,7 +76,7 @@ public abstract class MixinChestBlock {
     // The method is added to the block by ViaFabricPlus, so this addon can only inject into it
     @Inject(method = "getOcclusionShape", at = @At("HEAD"), cancellable = true)
     private void changeOcclusionShape(final BlockState state, final CallbackInfoReturnable<VoxelShape> cir) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (Features.COLLISION_SHAPES.isActive()) {
             if (state.getValue(ChestBlock.TYPE) == ChestType.SINGLE) {
                 cir.setReturnValue(SHAPE);
             } else {

@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.block;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
@@ -31,7 +32,6 @@ import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
-import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.jspecify.annotations.NonNull;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -73,14 +73,14 @@ public abstract class MixinSeaPickleBlock extends Block {
 
     @Inject(method = "getShape", at = @At("HEAD"), cancellable = true)
     private void changeOutlineShape(final BlockState state, final BlockGetter level, final BlockPos pos, final CollisionContext context, final CallbackInfoReturnable<VoxelShape> cir) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (Features.COLLISION_SHAPES.isActive()) {
             cir.setReturnValue(viaFabricPlusBedrock$shape);
         }
     }
 
     @Override
     public @NonNull VoxelShape getCollisionShape(final @NonNull BlockState state, final @NonNull BlockGetter world, final @NonNull BlockPos pos, final @NonNull CollisionContext context) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (Features.COLLISION_SHAPES.isActive()) {
             return Shapes.empty();
         } else {
             return super.getCollisionShape(state, world, pos, context);
@@ -89,7 +89,7 @@ public abstract class MixinSeaPickleBlock extends Block {
 
     @Override
     public @NonNull VoxelShape getOcclusionShape(final @NonNull BlockState state) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (Features.COLLISION_SHAPES.isActive()) {
             return switch (state.getValue(PICKLES)) {
                 case 2 -> SHAPE_TWO;
                 case 3 -> SHAPE_THREE;

@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.screen.form;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.libs.fastutil.ints.IntObjectPair;
@@ -38,7 +39,6 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.server.dialog.ActionButton;
 import net.minecraft.server.dialog.action.CustomAll;
-import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import net.raphimc.viabedrock.api.resourcepack.ResourcePack;
 import net.raphimc.viabedrock.protocol.storage.InventoryTracker;
 import net.raphimc.viabedrock.protocol.storage.ResourcePackStorage;
@@ -73,7 +73,7 @@ public final class BedrockForms {
     }
 
     public static boolean isActive() {
-        return BedrockProtocolVersion.BEDROCK_LATEST.equals(ViaFabricPlus.api().targetVersion());
+        return Features.FORMS.isActive();
     }
 
     public static int width(final int screenWidth) {

@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.entity;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.render.BedrockSkins;
 import net.minecraft.world.entity.Entity;
@@ -28,7 +29,6 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.entity.player.PlayerSkin;
 import net.minecraft.client.player.AbstractClientPlayer;
-import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -46,7 +46,7 @@ public abstract class MixinAbstractClientPlayer extends Entity {
 
     @Inject(method = "getSkin", at = @At("RETURN"), cancellable = true)
     private void useBedrockSkin(final CallbackInfoReturnable<PlayerSkin> cir) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (Features.PLAYER_SKINS.isActive()) {
             final BedrockSkins.Skin skin = BedrockSkins.get(this.getUUID());
             final PlayerSkin javaSkin = skin != null ? skin.javaSkin() : null;
             if (javaSkin != null) {

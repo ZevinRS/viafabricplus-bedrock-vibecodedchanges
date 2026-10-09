@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.google.common.collect.ImmutableList;
 import com.llamalad7.mixinextras.expression.Definition;
 import com.llamalad7.mixinextras.expression.Expression;
@@ -50,7 +51,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.PlayerAuthInputData;
 import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 import org.jspecify.annotations.Nullable;
@@ -82,7 +82,7 @@ public abstract class MixinEntity {
     @Inject(method = "updateSwimming", at = @At("HEAD"), cancellable = true)
     private void bedrockSwimStart(final CallbackInfo ci) {
         final Entity entity = (Entity) (Object) this;
-        if (this.isSwimming() || !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (this.isSwimming() || !Features.MOVEMENT_PHYSICS.isActive()) {
             return;
         }
         final boolean eyesInWater = entity.level().getFluidState(BlockPos.containing(entity.getX(), entity.getEyeY(), entity.getZ())).is(FluidTags.WATER);
@@ -97,7 +97,7 @@ public abstract class MixinEntity {
      */
     @Inject(method = "getBlockPosBelowThatAffectsMyMovement", at = @At("HEAD"), cancellable = true)
     private void frictionBelowCenter(final CallbackInfoReturnable<BlockPos> cir) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (Features.MOVEMENT_PHYSICS.isActive()) {
             final Entity entity = (Entity) (Object) this;
             cir.setReturnValue(BlockPos.containing(entity.getX(), entity.getY() - 0.500001, entity.getZ()));
         }
@@ -109,7 +109,7 @@ public abstract class MixinEntity {
      */
     @WrapOperation(method = "getBlockSpeedFactor", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/block/Block;getSpeedFactor()F"))
     private float noSoulSandSpeedFactor(final Block block, final Operation<Float> original) {
-        return block == Blocks.SOUL_SAND && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) ? 1F : original.call(block);
+        return block == Blocks.SOUL_SAND && Features.MOVEMENT_PHYSICS.isActive() ? 1F : original.call(block);
     }
 
     /**
@@ -118,12 +118,12 @@ public abstract class MixinEntity {
      */
     @WrapOperation(method = "getInputVector", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/Mth;sin(D)F"))
     private static float exactInputSin(final double angle, final Operation<Float> original) {
-        return ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) ? (float) Math.sin((float) angle) : original.call(angle);
+        return Features.MOVEMENT_PHYSICS.isActive() ? (float) Math.sin((float) angle) : original.call(angle);
     }
 
     @WrapOperation(method = "getInputVector", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/Mth;cos(D)F"))
     private static float exactInputCos(final double angle, final Operation<Float> original) {
-        return ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) ? (float) Math.cos((float) angle) : original.call(angle);
+        return Features.MOVEMENT_PHYSICS.isActive() ? (float) Math.cos((float) angle) : original.call(angle);
     }
 
     /**
@@ -135,7 +135,7 @@ public abstract class MixinEntity {
     private Vec3 keepGroundContact(final Vec3 movement, final MoverType type) {
         final Entity entity = (Entity) (Object) this;
         if (type == MoverType.SELF && movement.y == 0 && entity.onGround() && entity == Minecraft.getInstance().player
-            && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+            && Features.MOVEMENT_PHYSICS.isActive()) {
             return new Vec3(movement.x, -1.0E-7, movement.z);
         }
         return movement;
@@ -161,7 +161,7 @@ public abstract class MixinEntity {
     @Inject(method = "checkInsideBlocks(Ljava/util/List;Lnet/minecraft/world/entity/InsideBlockEffectApplier$StepBasedCollector;)V", at = @At("HEAD"), cancellable = true)
     private void insideBlocksAtPosition(final List<?> movements, final InsideBlockEffectApplier.StepBasedCollector effectCollector, final CallbackInfo ci) {
         final Entity entity = (Entity) (Object) this;
-        if (entity == Minecraft.getInstance().player && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (entity == Minecraft.getInstance().player && Features.MOVEMENT_PHYSICS.isActive()) {
             if (this.isAffectedByBlocks() && !movements.isEmpty()) {
                 this.checkInsideBlocks(entity.position(), entity.position(), effectCollector, this.visitedBlocks, 16);
                 this.visitedBlocks.clear();
@@ -182,7 +182,7 @@ public abstract class MixinEntity {
     private Vec3 bedrockBounce(final Vec3 movementAfterBounce, final Direction.Axis axis, final double bounce, final Operation<Vec3> original,
                                @Local(argsOnly = true) final Vec3 movement, @Local(name = "restitution") final double restitution) {
         final Entity entity = (Entity) (Object) this;
-        if (restitution <= 0 || entity != Minecraft.getInstance().player || !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (restitution <= 0 || entity != Minecraft.getInstance().player || !Features.MOVEMENT_PHYSICS.isActive()) {
             return original.call(movementAfterBounce, axis, bounce);
         }
         final double velocity = entity.getDeltaMovement().y;
@@ -209,7 +209,7 @@ public abstract class MixinEntity {
     private BlockPos bedrockSteppedOnBlock(final Entity instance, final Operation<BlockPos> original) {
         final BlockPos pos = original.call(instance);
         final Vec3 from = this.viaFabricPlusBedrock$moveFrom;
-        if (from == null || !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (from == null || !Features.MOVEMENT_PHYSICS.isActive()) {
             return pos;
         }
         final double halfWidth = 0.2;
@@ -220,7 +220,7 @@ public abstract class MixinEntity {
 
     @Inject(method = "setSwimming", at = @At("HEAD"))
     private void trackSwimming(final boolean swimming, final CallbackInfo ci) {
-        if (!ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (!Features.MOVEMENT_PHYSICS.isActive()) {
             return;
         }
 
@@ -235,7 +235,7 @@ public abstract class MixinEntity {
 
     @Redirect(method = "makeStuckInBlock", at = @At(value = "FIELD", target = "Lnet/minecraft/world/entity/Entity;stuckSpeedMultiplier:Lnet/minecraft/world/phys/Vec3;", opcode = Opcodes.PUTFIELD))
     private void prioritySlowestMovementMultiplier(final Entity instance, final Vec3 value) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) && this.stuckSpeedMultiplier != Vec3.ZERO) {
+        if (Features.MOVEMENT_PHYSICS.isActive() && this.stuckSpeedMultiplier != Vec3.ZERO) {
             this.stuckSpeedMultiplier = new Vec3(Math.min(this.stuckSpeedMultiplier.x, value.x), Math.min(this.stuckSpeedMultiplier.y, value.y), Math.min(this.stuckSpeedMultiplier.z, value.z));
         } else {
             this.stuckSpeedMultiplier = value;
@@ -250,13 +250,13 @@ public abstract class MixinEntity {
     @Expression("movementLength > ?")
     @ModifyExpressionValue(method = "move", at = @At("MIXINEXTRAS:EXPRESSION"))
     private boolean moveAnyDistance(final boolean original, @Local(name = "movementLength") final double movementLength) {
-        return original || movementLength > 0 && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST);
+        return original || movementLength > 0 && Features.MOVEMENT_PHYSICS.isActive();
     }
 
     // Bedrock ignores the box a vehicle would apply to its passengers
     @ModifyExpressionValue(method = "getFluidInteractionBox", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity;getVehicle()Lnet/minecraft/world/entity/Entity;"))
     private Entity skipPassengerChanges(final Entity vehicle) {
-        return ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) ? null : vehicle;
+        return Features.MOVEMENT_PHYSICS.isActive() ? null : vehicle;
     }
 
     /**
@@ -265,7 +265,7 @@ public abstract class MixinEntity {
      */
     @ModifyReturnValue(method = "getFluidInteractionBox", at = @At("RETURN"))
     private @Nullable AABB inflateFluidInteractionBox(final @Nullable AABB box) {
-        if (box != null && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (box != null && Features.MOVEMENT_PHYSICS.isActive()) {
             return box.inflate(-0.099, -0.4, -0.099);
         } else {
             return box;
@@ -339,7 +339,7 @@ public abstract class MixinEntity {
      */
     @WrapOperation(method = "collideWithShapes", at = @At(value = "INVOKE", target = "Lnet/minecraft/core/Direction;axisStepOrder(Lnet/minecraft/world/phys/Vec3;)Lcom/google/common/collect/ImmutableList;"))
     private static ImmutableList<Direction.Axis> bedrockAxisOrder(final Vec3 movement, final Operation<ImmutableList<Direction.Axis>> original) {
-        return ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) ? BEDROCK_AXIS_ORDER : original.call(movement);
+        return Features.MOVEMENT_PHYSICS.isActive() ? BEDROCK_AXIS_ORDER : original.call(movement);
     }
 
 }

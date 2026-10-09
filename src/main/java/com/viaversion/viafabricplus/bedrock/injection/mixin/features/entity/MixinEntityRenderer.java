@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.entity;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.injection.access.IEntityRenderState;
@@ -36,7 +37,6 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityAttachment;
 import net.minecraft.world.phys.Vec3;
-import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -59,7 +59,7 @@ public abstract class MixinEntityRenderer<T extends Entity, S extends EntityRend
         final IEntityRenderState bedrockState = (IEntityRenderState) state;
         bedrockState.viaFabricPlusBedrock$setNameLines(null);
         bedrockState.viaFabricPlusBedrock$setBodyHidden(false);
-        if (!ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (!Features.NAME_TAGS.isActive()) {
             return;
         }
         final BedrockNameTags.NameTag nameTag = BedrockNameTags.get(entity.getId());

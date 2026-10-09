@@ -22,6 +22,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
@@ -52,7 +53,7 @@ public abstract class MixinBlockBreakActions {
     private static void abortBrokenBlockBeforeStart(final ClientPlayerEntity player, final ClientPlayerEntity.AuthInputBlockAction action, final Operation<Void> original,
                                                     @Local(argsOnly = true) final PacketWrapper wrapper) {
         final BedrockPlacementState state = BedrockPlacementTranslator.state(wrapper.user());
-        if (state.brokenPosition() != null) {
+        if (state.brokenPosition() != null && Features.BLOCK_BREAKING.isEnabled()) {
             original.call(player, new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.AbortDestroyBlock, state.brokenPosition(), 0));
             state.setBrokenPosition(null);
         }
@@ -61,6 +62,10 @@ public abstract class MixinBlockBreakActions {
 
     @WrapOperation(method = "lambda$register$9", at = @At(value = "INVOKE", target = ADD_BLOCK_ACTION, ordinal = 2))
     private static void stopAtOrigin(final ClientPlayerEntity player, final ClientPlayerEntity.AuthInputBlockAction action, final Operation<Void> original) {
+        if (!Features.BLOCK_BREAKING.isEnabled()) {
+            original.call(player, action);
+            return;
+        }
         original.call(player, new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.StopDestroyBlock, new BlockPosition(0, 0, 0), 0));
     }
 
@@ -68,12 +73,18 @@ public abstract class MixinBlockBreakActions {
     private static void reportBrokenBlock(final ClientPlayerEntity player, final ClientPlayerEntity.AuthInputBlockAction action, final Operation<Void> original,
                                           @Local(argsOnly = true) final PacketWrapper wrapper) {
         original.call(player, action);
-        BedrockBlockBreak.onBlockBroken(wrapper.user(), action.position(), action.direction());
+        if (Features.BLOCK_BREAKING.isEnabled()) {
+            BedrockBlockBreak.onBlockBroken(wrapper.user(), action.position(), action.direction());
+        }
     }
 
     @WrapOperation(method = "lambda$register$9", at = @At(value = "INVOKE", target = ADD_BLOCK_ACTION, ordinal = 4))
     private static void keepBrokenBlock(final ClientPlayerEntity player, final ClientPlayerEntity.AuthInputBlockAction action, final Operation<Void> original,
                                         @Local(argsOnly = true) final PacketWrapper wrapper) {
+        if (!Features.BLOCK_BREAKING.isEnabled()) {
+            original.call(player, action);
+            return;
+        }
         final BedrockPlacementState state = BedrockPlacementTranslator.state(wrapper.user());
         state.setBrokenPosition(action.position());
         // The last crack_break of the broken block counts for this tick

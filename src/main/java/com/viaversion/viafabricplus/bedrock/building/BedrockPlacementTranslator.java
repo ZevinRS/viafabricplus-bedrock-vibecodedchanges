@@ -21,6 +21,8 @@
 
 package com.viaversion.viafabricplus.bedrock.building;
 
+import com.viaversion.viafabricplus.bedrock.feature.SwitchableHandlers;
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.BlockFace;
@@ -94,10 +96,10 @@ public final class BedrockPlacementTranslator {
     }
 
     public static void register(final BedrockProtocol protocol) {
-        protocol.replaceServerbound(ServerboundPackets26_3.USE_ITEM_ON, BedrockPlacementTranslator::useItemOn);
-        protocol.replaceServerbound(ServerboundPackets26_3.USE_ITEM, BedrockPlacementTranslator::useItem);
-        protocol.replaceServerbound(ServerboundPackets26_3.PUNCH, BedrockPlacementTranslator::punch);
-        protocol.replaceClientbound(ClientboundBedrockPackets.COMPLETED_USING_ITEM, BedrockPlacementTranslator::completedUsingItem);
+        SwitchableHandlers.replaceServerbound(protocol, ServerboundPackets26_3.USE_ITEM_ON, Features.ITEM_USE, BedrockPlacementTranslator::useItemOn);
+        SwitchableHandlers.replaceServerbound(protocol, ServerboundPackets26_3.USE_ITEM, Features.ITEM_USE, BedrockPlacementTranslator::useItem);
+        SwitchableHandlers.replaceServerbound(protocol, ServerboundPackets26_3.PUNCH, Features.ITEM_USE, BedrockPlacementTranslator::punch);
+        SwitchableHandlers.replaceClientbound(protocol, ClientboundBedrockPackets.COMPLETED_USING_ITEM, Features.ITEM_USE, BedrockPlacementTranslator::completedUsingItem);
     }
 
     public static BedrockPlacementState state(final UserConnection user) {

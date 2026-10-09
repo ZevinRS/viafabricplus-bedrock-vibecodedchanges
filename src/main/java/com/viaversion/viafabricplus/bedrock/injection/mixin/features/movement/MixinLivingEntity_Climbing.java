@@ -21,13 +21,13 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
-import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -52,7 +52,7 @@ public abstract class MixinLivingEntity_Climbing {
 
     @Unique
     private boolean viaFabricPlusBedrock$isBedrockPlayer() {
-        return (Object) this == Minecraft.getInstance().player && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST);
+        return (Object) this == Minecraft.getInstance().player && Features.MOVEMENT_PHYSICS.isActive();
     }
 
     @WrapOperation(method = "handleRelativeFrictionAndCalculateMovement", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;handleOnClimbable(Lnet/minecraft/world/phys/Vec3;)Lnet/minecraft/world/phys/Vec3;"))

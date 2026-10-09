@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -60,10 +61,11 @@ public abstract class MixinClientPlayerPackets {
     @WrapOperation(method = "*", at = @At(value = "INVOKE", target = "Lnet/raphimc/viabedrock/api/util/MathUtil;calculateMovementDirections(Ljava/util/Set;Z)Lnet/raphimc/viabedrock/protocol/model/Position2f;", ordinal = 0))
     private static Position2f slowMoveVectorWhileUsingItem(final Set<PlayerAuthInputData> authInputData, final boolean sneaking, final Operation<Position2f> original) {
         final Position2f moveVector = original.call(authInputData, sneaking);
-        if (!BedrockItemUse.isSlowedByItemUse()) {
+        if (!BedrockItemUse.isSlowedByItemUse() || !Features.AUTH_INPUT.isEnabled()) {
             return moveVector;
         }
-        return new Position2f(moveVector.x() * BedrockItemUse.ITEM_USE_SPEED_MULTIPLIER, moveVector.y() * BedrockItemUse.ITEM_USE_SPEED_MULTIPLIER);
+        final float multiplier = Features.ITEM_USE_SPEED.get().floatValue();
+        return new Position2f(moveVector.x() * multiplier, moveVector.y() * multiplier);
     }
 
     /**
@@ -74,7 +76,7 @@ public abstract class MixinClientPlayerPackets {
     @ModifyVariable(method = "lambda$register$18", at = @At(value = "LOAD", ordinal = 0), index = 6)
     private static Position3f sendRealVelocity(final Position3f estimated) {
         final Position3f velocity = BedrockAuthInput.velocity();
-        return velocity != null ? velocity : estimated;
+        return velocity != null && Features.AUTH_INPUT.isEnabled() ? velocity : estimated;
     }
 
     /**
@@ -84,7 +86,7 @@ public abstract class MixinClientPlayerPackets {
     @WrapOperation(method = "lambda$register$18", at = @At(value = "INVOKE", target = "Lnet/raphimc/viabedrock/protocol/model/Position3f;y()F", ordinal = 2))
     private static float bedrockInteractYaw(final Position3f rotation, final Operation<Float> original) {
         final float yaw = original.call(rotation);
-        return ((yaw + 270F) % 360F + 360F) % 360F - 270F;
+        return Features.AUTH_INPUT.isEnabled() ? ((yaw + 270F) % 360F + 360F) % 360F - 270F : yaw;
     }
 
     /**
@@ -93,7 +95,7 @@ public abstract class MixinClientPlayerPackets {
      */
     @Inject(method = "lambda$register$18", at = @At("HEAD"))
     private static void keepSprintingFlagWhileLoading(final PacketWrapper wrapper, final CallbackInfo ci) {
-        if (BedrockDimensionChange.sendsSprinting()) {
+        if (BedrockDimensionChange.sendsSprinting() && Features.DIMENSION_CHANGE.isEnabled()) {
             wrapper.user().get(EntityTracker.class).getClientPlayer().addAuthInputData(PlayerAuthInputData.Sprinting);
         }
     }
@@ -104,6 +106,9 @@ public abstract class MixinClientPlayerPackets {
      */
     @Inject(method = "lambda$register$18", at = @At("HEAD"))
     private static void abortBrokenBlockAfterAttack(final PacketWrapper wrapper, final CallbackInfo ci) {
+        if (!Features.BLOCK_BREAKING.isEnabled()) {
+            return;
+        }
         final BedrockPlacementState state = BedrockPlacementTranslator.state(wrapper.user());
         final boolean cracked = state.consumeCrackedThisTick();
         if (state.brokenPosition() != null && !cracked) {
@@ -122,7 +127,7 @@ public abstract class MixinClientPlayerPackets {
      */
     @Inject(method = "lambda$register$18", at = @At("HEAD"))
     private static void prepareBlockBreak(final PacketWrapper wrapper, final CallbackInfo ci) {
-        viaFabricPlusBedrock$breakTransaction = BedrockBlockBreak.prepareInput(wrapper.user());
+        viaFabricPlusBedrock$breakTransaction = Features.BLOCK_BREAKING.isEnabled() ? BedrockBlockBreak.prepareInput(wrapper.user()) : null;
     }
 
     /**
@@ -152,7 +157,7 @@ public abstract class MixinClientPlayerPackets {
      */
     @WrapWithCondition(method = "lambda$register$18", at = @At(value = "INVOKE", target = "Lnet/raphimc/viabedrock/api/model/entity/ClientPlayerEntity;addAuthInputData(Lnet/raphimc/viabedrock/protocol/data/enums/bedrock/generated/PlayerAuthInputData;)V"))
     private static boolean startJumpingOnlyWithJump(final ClientPlayerEntity player, final PlayerAuthInputData data) {
-        return data != PlayerAuthInputData.StartJumping || viaFabricPlusBedrock$jumped;
+        return data != PlayerAuthInputData.StartJumping || viaFabricPlusBedrock$jumped || !Features.AUTH_INPUT.isEnabled();
     }
 
 }

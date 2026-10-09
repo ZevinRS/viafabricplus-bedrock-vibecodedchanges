@@ -62,11 +62,6 @@ import org.jetbrains.annotations.Nullable;
  */
 public final class BedrockBuilding {
 
-    public static final double SURVIVAL_PICK_RANGE = 5.7; // With mouse input
-    public static final double CREATIVE_PICK_RANGE = 12.0;
-    public static final double SURVIVAL_ATTACK_RANGE = 3.0;
-    public static final double CREATIVE_ATTACK_RANGE = 5.0;
-
     private static final double MIN_MOVE_DELTA_SQR = 0.01;
     private static final long MAX_LAG_NANOS = 180_000_000L;
     private static final float MIN_MOVING_NON_CREATIVE_BUILD_DELAY = 100.0F;

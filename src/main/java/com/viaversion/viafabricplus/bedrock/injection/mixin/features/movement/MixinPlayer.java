@@ -21,22 +21,20 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.building.BedrockSprint;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Avatar;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
-import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -51,7 +49,7 @@ public abstract class MixinPlayer extends Avatar {
 
     @Redirect(method = "travel", at = @At(value = "INVOKE", target = "Lnet/minecraft/core/BlockPos;containing(DDD)Lnet/minecraft/core/BlockPos;"))
     private BlockPos modifyWaterAbovePosition(final double x, final double y, final double z) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (Features.MOVEMENT_PHYSICS.isActive()) {
             return BlockPos.containing(x, y - 0.9, z);
         } else {
             return BlockPos.containing(x, y, z);
@@ -60,12 +58,12 @@ public abstract class MixinPlayer extends Avatar {
 
     @WrapWithCondition(method = "travel", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Player;setDeltaMovement(Lnet/minecraft/world/phys/Vec3;)V", ordinal = 0))
     private boolean preventSwimmingMotionWhenJumping(final Player instance, final Vec3 movement) {
-        return !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) || !instance.isJumping();
+        return !Features.MOVEMENT_PHYSICS.isActive() || !instance.isJumping();
     }
 
     @Inject(method = "travel", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Player;getAbilities()Lnet/minecraft/world/entity/player/Abilities;"))
     private void preventJumpingWhenStartedSwimming(final Vec3 input, final CallbackInfo ci) {
-        if (!ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (!Features.MOVEMENT_PHYSICS.isActive()) {
             return;
         }
 
@@ -86,7 +84,7 @@ public abstract class MixinPlayer extends Avatar {
     @Redirect(method = "getDesiredPose", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Player;isSwimming()Z"))
     private boolean swimmingPoseOneTickLater(final Player instance) {
         final boolean swimming = instance.isSwimming();
-        if (!ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (!Features.MOVEMENT_PHYSICS.isActive()) {
             return swimming;
         }
         final boolean swimmingBefore = this.viaFabricPlusBedrock$swimmingAtLastPose;
@@ -96,7 +94,7 @@ public abstract class MixinPlayer extends Avatar {
 
     @Redirect(method = "travel", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Player;isSwimming()Z"))
     private boolean preventSwimmingResurface(final Player instance) {
-        if (!ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) || !instance.isSwimming()) {
+        if (!Features.MOVEMENT_PHYSICS.isActive() || !instance.isSwimming()) {
             return instance.isSwimming();
         }
 
@@ -117,7 +115,7 @@ public abstract class MixinPlayer extends Avatar {
 
     @Redirect(method = "travel", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Player;setDeltaMovement(Lnet/minecraft/world/phys/Vec3;)V", ordinal = 1))
     private void removeFlySlipperiness(final Player instance, final Vec3 movement, @Local(argsOnly = true) final Vec3 input) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) && input.horizontalDistanceSqr() == 0) {
+        if (Features.MOVEMENT_PHYSICS.isActive() && input.horizontalDistanceSqr() == 0) {
             instance.setDeltaMovement(new Vec3(0, movement.y, 0));
         } else {
             instance.setDeltaMovement(movement);

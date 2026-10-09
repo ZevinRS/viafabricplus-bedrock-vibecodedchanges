@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.hud;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.injection.access.IChunkTracker;
 import com.viaversion.viafabricplus.bedrock.injection.access.IRakSessionCodec;
@@ -75,7 +76,7 @@ public final class BedrockDebugHudEntry implements DebugScreenEntry {
 
     @Override
     public boolean isAllowed(final boolean reducedDebugInfo) {
-        return true;
+        return Features.DEBUG_HUD.isEnabled();
     }
 
 }

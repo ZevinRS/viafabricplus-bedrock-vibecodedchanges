@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.viaversion.viafabricplus.bedrock.building.BedrockSprint;
 import com.viaversion.viaversion.api.minecraft.entitydata.EntityData;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
@@ -71,7 +72,7 @@ public abstract class MixinLivingEntity {
     @Inject(method = "translateAttribute", at = @At("HEAD"), cancellable = true)
     private void translateClientPlayerSpeed(final EntityAttribute attribute, final PacketWrapper javaAttributes, final AtomicInteger attributeCount,
                                             final List<EntityData> javaEntityData, final CallbackInfoReturnable<Boolean> cir) {
-        if (!((Object) this instanceof ClientPlayerEntity) || !attribute.name().equals("minecraft:movement")) {
+        if (!((Object) this instanceof ClientPlayerEntity) || !attribute.name().equals("minecraft:movement") || !Features.SPRINT.isEnabled()) {
             return;
         }
         // Bedrock only acts on a changed value. Dragonfly sends the speed again with every other attribute, which on Java

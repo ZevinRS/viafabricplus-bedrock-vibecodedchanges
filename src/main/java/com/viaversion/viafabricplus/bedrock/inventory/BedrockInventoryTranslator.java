@@ -21,6 +21,8 @@
 
 package com.viaversion.viafabricplus.bedrock.inventory;
 
+import com.viaversion.viafabricplus.bedrock.feature.SwitchableHandlers;
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.building.BedrockPlacementTranslator;
 import com.viaversion.viaversion.api.connection.UserConnection;
@@ -87,8 +89,8 @@ public final class BedrockInventoryTranslator {
     }
 
     public static void register(final BedrockProtocol protocol) {
-        protocol.replaceServerbound(ServerboundPackets26_3.CONTAINER_CLICK, BedrockInventoryTranslator::containerClick);
-        protocol.replaceClientbound(ClientboundBedrockPackets.ITEM_STACK_RESPONSE, BedrockInventoryTranslator::itemStackResponse);
+        SwitchableHandlers.replaceServerbound(protocol, ServerboundPackets26_3.CONTAINER_CLICK, Features.INVENTORY_TRANSACTIONS, BedrockInventoryTranslator::containerClick);
+        SwitchableHandlers.replaceClientbound(protocol, ClientboundBedrockPackets.ITEM_STACK_RESPONSE, Features.INVENTORY_TRANSACTIONS, BedrockInventoryTranslator::itemStackResponse);
     }
 
     private static BedrockInventoryState state(final UserConnection user) {

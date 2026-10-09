@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.block;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.injection.access.IBlockStatePredictionHandler;
 import com.viaversion.viafabricplus.bedrock.injection.mixin.core.access.MixinBlockStatePredictionHandler_ServerVerifiedState;
@@ -36,7 +37,6 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Util;
 import net.minecraft.world.level.block.state.BlockState;
-import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -56,9 +56,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  */
 @Mixin(BlockStatePredictionHandler.class)
 public abstract class MixinBlockStatePredictionHandler implements IBlockStatePredictionHandler {
-
-    @Unique
-    private static final long viaFabricPlusBedrock$SERVER_UPDATE_TIMEOUT = 1500;
 
     @Shadow
     @Final
@@ -92,7 +89,7 @@ public abstract class MixinBlockStatePredictionHandler implements IBlockStatePre
 
     @Inject(method = "endPredictionsUpTo", at = @At("HEAD"), cancellable = true)
     private void waitForServerUpdates(final int sequence, final ClientLevel clientLevel, final CallbackInfo ci) {
-        if (!BedrockProtocolVersion.BEDROCK_LATEST.equals(ViaFabricPlus.api().targetVersion())) {
+        if (!Features.BLOCK_PREDICTION_HOLD.isActive()) {
             return;
         }
         ci.cancel();
@@ -121,7 +118,7 @@ public abstract class MixinBlockStatePredictionHandler implements IBlockStatePre
             if (!this.viaFabricPlusBedrock$acknowledgedAt.containsKey(key)) {
                 continue;
             }
-            if (!this.viaFabricPlusBedrock$serverUpdated.contains(key) && now - this.viaFabricPlusBedrock$acknowledgedAt.get(key) < viaFabricPlusBedrock$SERVER_UPDATE_TIMEOUT) {
+            if (!this.viaFabricPlusBedrock$serverUpdated.contains(key) && now - this.viaFabricPlusBedrock$acknowledgedAt.get(key) < Features.SERVER_UPDATE_TIMEOUT.get()) {
                 continue;
             }
 

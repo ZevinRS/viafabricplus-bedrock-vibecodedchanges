@@ -22,6 +22,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.viaversion.viafabricplus.bedrock.protocoltranslator.resourcepack.BedrockGlyphSheets;
 import net.raphimc.viabedrock.api.resourcepack.content.Content;
 import net.raphimc.viabedrock.protocol.rewriter.resourcepack.GlyphSheetResourceRewriter;
@@ -40,6 +41,9 @@ public abstract class MixinGlyphSheetResourceRewriter {
      */
     @Inject(method = "handleGlyphSheets", at = @At("HEAD"), cancellable = true)
     private void convertGlyphSheets(final ResourcePackStorage resourcePackStorage, final CallbackInfoReturnable<Content> cir) {
+        if (!Features.GLYPH_SHEETS.isEnabled()) {
+            return;
+        }
         cir.setReturnValue(BedrockGlyphSheets.convert(resourcePackStorage));
     }
 

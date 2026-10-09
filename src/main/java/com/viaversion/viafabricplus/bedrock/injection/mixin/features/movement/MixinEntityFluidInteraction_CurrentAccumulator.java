@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.llamalad7.mixinextras.expression.Definition;
 import com.llamalad7.mixinextras.expression.Expression;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
@@ -29,7 +30,6 @@ import com.viaversion.viafabricplus.ViaFabricPlus;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityFluidInteraction;
 import net.minecraft.world.entity.player.Player;
-import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Constant;
@@ -44,13 +44,13 @@ public abstract class MixinEntityFluidInteraction_CurrentAccumulator {
     @Expression("entity instanceof Player")
     @ModifyExpressionValue(method = "applyTo", at = @At("MIXINEXTRAS:EXPRESSION"))
     private boolean normalizeInsteadScale(final boolean original) {
-        return !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) && original;
+        return !Features.MOVEMENT_PHYSICS.isActive() && original;
     }
 
     // Dropping the threshold skips the boost small currents would get
     @ModifyConstant(method = "applyTo", constant = @Constant(doubleValue = 0.0045000000000000005, ordinal = 0))
     private double dontScaleSmallValues(final double constant) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (Features.MOVEMENT_PHYSICS.isActive()) {
             return -1;
         } else {
             return constant;

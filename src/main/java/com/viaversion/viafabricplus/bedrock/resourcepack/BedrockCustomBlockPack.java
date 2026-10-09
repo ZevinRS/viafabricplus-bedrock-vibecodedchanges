@@ -50,7 +50,8 @@ import org.jetbrains.annotations.Nullable;
 /**
  * The models of the blocks a server defines, as a resource pack for the blocks of the pool they were given, see
  * {@link BedrockCustomBlocks}. The server only defines its blocks once its resource packs were converted and loaded, so
- * this pack is loaded on top afterwards, like another server resource pack.
+ * this pack is loaded on top afterwards, like another server resource pack, unless the same models were loaded with the
+ * packs already, see {@link BedrockBlockPackCache}.
  */
 public final class BedrockCustomBlockPack {
 
@@ -76,9 +77,15 @@ public final class BedrockCustomBlockPack {
                 }
                 content.putJson("assets/" + BedrockCustomBlocks.NAMESPACE + "/lang/en_us.json", lang);
                 content.putJson("pack.mcmeta", manifest());
+                if (BedrockBlockPackCache.isLoaded(packs, content)) {
+                    ViaFabricPlusBedrock.impl().logger().info("The models of the server's blocks were loaded with its packs");
+                    return;
+                }
+                final byte[] zip = content.toZip();
+                BedrockBlockPackCache.keep(packs, zip);
                 final Path file = Files.createTempFile("viafabricplus-bedrock-blocks", ".zip");
                 file.toFile().deleteOnExit();
-                Files.write(file, content.toZip());
+                Files.write(file, zip);
                 ViaFabricPlusBedrock.impl().logger().info("Made the models of the server's blocks, {} textures", textures.size());
                 Minecraft.getInstance().execute(() -> {
                     Minecraft.getInstance().getDownloadedPackSource().popPack(PACK_ID);
@@ -136,7 +143,7 @@ public final class BedrockCustomBlockPack {
             cubeTextures.addProperty("particle", faceTextures.get(Direction.NORTH));
             blockModel.add("textures", cubeTextures);
         }
-        content.putJson(assets + "models/block/" + path + ".json", blockModel);
+        content.putJson(assets + "models/block/" + path + ".json", sorted(blockModel));
 
         final JsonObject variant = new JsonObject();
         variant.addProperty("model", model);
@@ -164,6 +171,28 @@ public final class BedrockCustomBlockPack {
     }
 
     /**
+     * The converter keeps some parts of a model in hash maps, whose order changes between starts of the game, so the
+     * keys are sorted to make the same pack every time, see {@link BedrockBlockPackCache}.
+     */
+    private static JsonObject sorted(final JsonObject object) {
+        final JsonObject sorted = new JsonObject();
+        object.keySet().stream().sorted().forEach(key -> sorted.add(key, sorted(object.get(key))));
+        return sorted;
+    }
+
+    private static JsonElement sorted(final JsonElement element) {
+        if (element instanceof final JsonObject object) {
+            return sorted(object);
+        }
+        if (element instanceof final JsonArray array) {
+            final JsonArray sorted = new JsonArray();
+            array.forEach(item -> sorted.add(sorted(item)));
+            return sorted;
+        }
+        return element;
+    }
+
+    /**
      * Bedrock's alpha_test and blend materials draw faces from both sides, their *_single_sided forms and opaque don't.
      */
     private static boolean isDoubleSided(final @Nullable String renderMethod) {
@@ -186,6 +215,8 @@ public final class BedrockCustomBlockPack {
                     || !(faceObject.get("texture") instanceof final JsonElement texture)
                     || !textures.has(texture.getAsString().substring(texture.getAsString().startsWith("#") ? 1 : 0)));
                 if (!faces.isEmpty()) { // Java doesn't load parts without faces
+                    // The converter names parts at random, which would make every build of the pack differ
+                    object.remove("name");
                     textured.add(object);
                 }
             }

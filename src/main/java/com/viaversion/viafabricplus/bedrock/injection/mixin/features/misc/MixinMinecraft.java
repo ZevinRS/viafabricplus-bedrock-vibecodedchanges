@@ -21,10 +21,10 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.misc;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.building.BedrockBuilding;
 import com.viaversion.viafabricplus.bedrock.building.BedrockDimensionChange;
 import com.viaversion.viafabricplus.bedrock.building.BedrockInputReplay;
@@ -41,7 +41,6 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -61,7 +60,7 @@ public abstract class MixinMinecraft {
 
     @Inject(method = "startUseItem", at = @At("HEAD"))
     private void startBedrockBuild(final CallbackInfo ci) {
-        if (BedrockBuilding.isActive()) {
+        if (Features.BUILDING.isActive()) {
             BedrockBuilding.instance().startBuild();
         }
     }
@@ -85,6 +84,15 @@ public abstract class MixinMinecraft {
             original.call(instance);
             return;
         }
+        if (!Features.BUILDING.isEnabled()) {
+            BedrockItemUse.setRepeating(true);
+            try {
+                original.call(instance);
+            } finally {
+                BedrockItemUse.setRepeating(false);
+            }
+            return;
+        }
         // Holding use with a block places blocks through Bedrock's building instead of repeating the click every 4 ticks
         if (BedrockBuilding.isHoldingBlock(this.player)) {
             return;
@@ -99,7 +107,7 @@ public abstract class MixinMinecraft {
 
     @Inject(method = "pick(F)V", at = @At("TAIL"))
     private void continueBedrockBuild(final float partialTicks, final CallbackInfo ci) {
-        if (BedrockBuilding.isActive()) {
+        if (Features.BUILDING.isActive()) {
             BedrockBuilding.instance().frame((Minecraft) (Object) this, partialTicks);
         }
     }
@@ -114,7 +122,7 @@ public abstract class MixinMinecraft {
 
     @ModifyExpressionValue(method = "pick(F)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;raycastHitResult(FLnet/minecraft/world/entity/Entity;)Lnet/minecraft/world/phys/HitResult;"))
     private HitResult bedrockReachAroundRaycast(final HitResult hitResult) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (Features.REACH_AROUND.isActive()) {
             final Entity entity = this.getCameraEntity();
             if (hitResult.getType() != HitResult.Type.MISS) return hitResult;
             if (!this.viaFabricPlusBedrock$canReachAround(entity)) return hitResult;
@@ -132,7 +140,7 @@ public abstract class MixinMinecraft {
 
     @Unique
     private boolean viaFabricPlusBedrock$canReachAround(final Entity entity) {
-        return entity.onGround() && entity.getVehicle() == null && entity.getXRot() >= 45;
+        return entity.onGround() && entity.getVehicle() == null && entity.getXRot() >= Features.MIN_PITCH.get();
     }
 
 }

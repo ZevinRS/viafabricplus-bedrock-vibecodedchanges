@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.block;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
@@ -31,7 +32,6 @@ import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
-import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.jspecify.annotations.NonNull;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -68,14 +68,14 @@ public abstract class MixinLanternBlock extends Block {
 
     @Inject(method = "getShape", at = @At("RETURN"), cancellable = true)
     private void changeOutlineShape(final BlockState state, final BlockGetter level, final BlockPos pos, final CollisionContext context, final CallbackInfoReturnable<VoxelShape> cir) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (Features.COLLISION_SHAPES.isActive()) {
             cir.setReturnValue(state.getValue(HANGING) ? viaFabricPlusBedrock$shape_hanging : viaFabricPlusBedrock$shape);
         }
     }
 
     @Override
     public @NonNull VoxelShape getOcclusionShape(final @NonNull BlockState state) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (Features.COLLISION_SHAPES.isActive()) {
             return state.getValue(HANGING) ? SHAPE_HANGING : SHAPE_STANDING;
         } else {
             return super.getOcclusionShape(state);

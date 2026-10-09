@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.ViaFabricPlus;
@@ -56,7 +57,7 @@ public abstract class MixinClientPacketListener {
     @Inject(method = "handleUpdateAttributes", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/protocol/PacketUtils;ensureRunningOnSameThread(Lnet/minecraft/network/protocol/Packet;Lnet/minecraft/network/PacketListener;Lnet/minecraft/network/PacketProcessor;)V", shift = At.Shift.AFTER), cancellable = true)
     private void applyAttributesLater(final ClientboundUpdateAttributesPacket packet, final CallbackInfo ci) {
         if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)
-            && BedrockPacketDelay.hold(packet, packet.getEntityId(), BedrockPacketDelay.ATTRIBUTE_MOVES, ClientPacketListener::handleUpdateAttributes)) {
+            && BedrockPacketDelay.hold(packet, packet.getEntityId(), Features.ATTRIBUTE_MOVES.get(), ClientPacketListener::handleUpdateAttributes)) {
             ci.cancel();
         }
     }
@@ -64,7 +65,7 @@ public abstract class MixinClientPacketListener {
     @Inject(method = "handleSetEntityMotion", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/protocol/PacketUtils;ensureRunningOnSameThread(Lnet/minecraft/network/protocol/Packet;Lnet/minecraft/network/PacketListener;Lnet/minecraft/network/PacketProcessor;)V", shift = At.Shift.AFTER), cancellable = true)
     private void applyMotionLater(final ClientboundSetEntityMotionPacket packet, final CallbackInfo ci) {
         if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)
-            && (BedrockPacketDelay.ignoreMotion(packet.id()) || BedrockPacketDelay.hold(packet, packet.id(), BedrockPacketDelay.MOTION_MOVES, ClientPacketListener::handleSetEntityMotion))) {
+            && (BedrockPacketDelay.ignoreMotion(packet.id()) || BedrockPacketDelay.hold(packet, packet.id(), Features.MOTION_MOVES.get(), ClientPacketListener::handleSetEntityMotion))) {
             ci.cancel();
         }
     }
@@ -76,7 +77,7 @@ public abstract class MixinClientPacketListener {
         }
         // The immobile flag has no Java entity data, so it's taken from the flags of the packet and applied with it
         final boolean immobile = BedrockImmobile.serverFlag();
-        if (BedrockPacketDelay.hold(packet, packet.id(), BedrockPacketDelay.ENTITY_DATA_MOVES, (listener, held) -> {
+        if (BedrockPacketDelay.hold(packet, packet.id(), Features.ENTITY_DATA_MOVES.get(), (listener, held) -> {
             listener.handleSetEntityData(held);
             BedrockImmobile.setImmobile(immobile);
         })) {
@@ -103,7 +104,7 @@ public abstract class MixinClientPacketListener {
 
     @Inject(method = "handleRespawn", at = @At("TAIL"))
     private void startDimensionChangeLoading(final CallbackInfo ci) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (Features.DIMENSION_CHANGE.isActive()) {
             BedrockDimensionChange.onRespawnHandled();
         }
     }

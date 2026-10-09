@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.bedrock.render.BedrockEntityModels;
@@ -94,7 +95,7 @@ public abstract class MixinCustomEntity extends Entity {
     private void drawBedrockModel(final CallbackInfo ci) {
         this.viaFabricPlusBedrock$spawnedScale = this.viaFabricPlusBedrock$scale();
         final ResourcePackStorage packs = this.user.get(ResourcePackStorage.class);
-        if (packs != null && BedrockEntityModels.spawn(packs, (CustomEntity) (Object) this, this.entityDefinition.identifier(), this.models)) {
+        if (packs != null && Features.CUSTOM_ENTITY_MODELS.isEnabled() && BedrockEntityModels.spawn(packs, (CustomEntity) (Object) this, this.entityDefinition.identifier(), this.models)) {
             this.spawned = true;
             ci.cancel();
         }

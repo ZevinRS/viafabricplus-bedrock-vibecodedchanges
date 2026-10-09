@@ -22,6 +22,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.bedrock.building.BedrockDimensionChange;
@@ -42,7 +43,7 @@ public abstract class MixinDimensionChangeAck {
 
     @WrapOperation(method = "lambda$register$3", at = @At(value = "INVOKE", target = "Lnet/raphimc/viabedrock/api/model/entity/ClientPlayerEntity;sendPlayerActionPacketToServer(Lnet/raphimc/viabedrock/protocol/data/enums/bedrock/generated/PlayerActionType;)V"))
     private static void acknowledgeLater(final ClientPlayerEntity player, final PlayerActionType action, final Operation<Void> original) {
-        if (action == PlayerActionType.ChangeDimensionAck) {
+        if (action == PlayerActionType.ChangeDimensionAck && Features.DIMENSION_CHANGE.isEnabled()) {
             BedrockDimensionChange.onServerAcknowledged();
         } else {
             original.call(player, action);
@@ -51,6 +52,9 @@ public abstract class MixinDimensionChangeAck {
 
     @WrapOperation(method = "lambda$register$3", at = @At(value = "INVOKE", target = "Lnet/raphimc/viabedrock/api/util/PacketFactory;sendBedrockLoadingScreen(Lcom/viaversion/viaversion/api/connection/UserConnection;Lnet/raphimc/viabedrock/protocol/data/enums/bedrock/generated/ServerboundLoadingScreenPacketType;Ljava/lang/Long;)V"))
     private static void endLoadingScreenLater(final UserConnection user, final ServerboundLoadingScreenPacketType type, final Long loadingScreenId, final Operation<Void> original) {
+        if (!Features.DIMENSION_CHANGE.isEnabled()) {
+            original.call(user, type, loadingScreenId);
+        }
     }
 
 }

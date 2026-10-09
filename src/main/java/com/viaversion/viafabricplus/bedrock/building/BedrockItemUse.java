@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.building;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viaversion.api.connection.UserConnection;
@@ -69,13 +70,8 @@ import org.jetbrains.annotations.Nullable;
  */
 public final class BedrockItemUse {
 
-    // The movement input while using an item, as recorded from the Bedrock client
-    public static final float ITEM_USE_SPEED_MULTIPLIER = 0.1225F;
-
     private static final Queue<BucketUse> BUCKET_USES = new ConcurrentLinkedQueue<>();
     private static final long BUCKET_USE_TIMEOUT_NANOS = 1_000_000_000L;
-    private static final int FIRST_EATING_EVENT_TICK = 8;
-    private static final int EATING_EVENT_INTERVAL = 4;
 
     // Ticks since using an item started, counted on the render thread
     private static int ticksUsing = -1;
@@ -165,7 +161,7 @@ public final class BedrockItemUse {
      * Called after the client used its main hand item, while it is still handling the use button.
      */
     public static void onItemUsed(final LocalPlayer player) {
-        if (!player.isUsingItem() || !BedrockBuilding.isActive()) {
+        if (!player.isUsingItem() || !Features.ITEM_USE.isActive()) {
             return;
         }
         // Counted up at the end of this tick, so the tick using started is tick 0
@@ -180,7 +176,7 @@ public final class BedrockItemUse {
      */
     public static void tick(final Minecraft minecraft) {
         final LocalPlayer player = minecraft.player;
-        if (!tracking || player == null || !BedrockBuilding.isActive()) {
+        if (!tracking || player == null || !Features.ITEM_USE.isActive()) {
             return;
         }
         if (finishPending) {
@@ -199,7 +195,7 @@ public final class BedrockItemUse {
         if (animation != ItemUseAnimation.EAT && animation != ItemUseAnimation.DRINK) {
             return;
         }
-        if (ticksUsing >= FIRST_EATING_EVENT_TICK && ticksUsing % EATING_EVENT_INTERVAL == 0) {
+        if (ticksUsing >= Features.FIRST_EATING_EVENT_TICK.get() && ticksUsing % Features.EATING_EVENT_INTERVAL.get() == 0) {
             runOnConnection(BedrockItemUse::sendEatingEvent);
         }
         if (ticksUsing == useItem.getUseDuration(player)) {

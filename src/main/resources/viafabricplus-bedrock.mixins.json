@@ -76,6 +76,7 @@
     "features.movement.MixinLocalPlayer",
     "features.movement.MixinPlayer",
     "viabedrock.MixinBedrockProtocol",
+    "viabedrock.MixinAbstractProtocol",
     "viabedrock.MixinBedrockEntity",
     "viabedrock.MixinBedrockMappingData",
     "viabedrock.MixinBlockBreakActions",
@@ -97,6 +98,7 @@
     "viabedrock.MixinOffhandContainer",
     "viabedrock.MixinResourcePackLoadStateTracker",
     "viabedrock.MixinResourcePackPackets",
+    "viabedrock.MixinResourcePackRewriter",
     "viabedrock.MixinRespawnGameModeEncoding"
   ],
   "injectors": {

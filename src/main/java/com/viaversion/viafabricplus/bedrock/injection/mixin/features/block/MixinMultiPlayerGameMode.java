@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.block;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.building.BedrockBlockBreak;
@@ -74,8 +75,8 @@ public abstract class MixinMultiPlayerGameMode {
 
     @Inject(method = "performUseItemOn", at = @At("HEAD"))
     private void checkPlacingBlock(final LocalPlayer player, final InteractionHand hand, final BlockHitResult hit, final CallbackInfoReturnable<InteractionResult> cir) {
-        this.viaFabricPlusBedrock$placingBlock = hand == InteractionHand.MAIN_HAND && player.getMainHandItem().getItem() instanceof BlockItem && BedrockBuilding.isActive();
-        this.viaFabricPlusBedrock$usingBucket = hand == InteractionHand.MAIN_HAND && player.getMainHandItem().getItem() instanceof BucketItem && BedrockBuilding.isActive();
+        this.viaFabricPlusBedrock$placingBlock = hand == InteractionHand.MAIN_HAND && player.getMainHandItem().getItem() instanceof BlockItem && Features.ITEM_USE.isActive();
+        this.viaFabricPlusBedrock$usingBucket = hand == InteractionHand.MAIN_HAND && player.getMainHandItem().getItem() instanceof BucketItem && Features.ITEM_USE.isActive();
     }
 
     /**
@@ -99,7 +100,7 @@ public abstract class MixinMultiPlayerGameMode {
     @Inject(method = "useItem", at = @At("HEAD"))
     private void recordBucketUse(final Player player, final InteractionHand hand, final CallbackInfoReturnable<InteractionResult> cir) {
         if (hand == InteractionHand.MAIN_HAND && player instanceof final LocalPlayer localPlayer && !player.isSpectator()
-            && player.getMainHandItem().getItem() instanceof BucketItem && BedrockBuilding.isActive()) {
+            && player.getMainHandItem().getItem() instanceof BucketItem && Features.ITEM_USE.isActive()) {
             BedrockItemUse.recordBucketUse(localPlayer, false, false);
         }
     }
@@ -116,7 +117,7 @@ public abstract class MixinMultiPlayerGameMode {
      */
     @Inject(method = "destroyBlock", at = @At("HEAD"))
     private void recordToolDamage(final BlockPos pos, final CallbackInfoReturnable<Boolean> cir) {
-        if (BedrockProtocolVersion.BEDROCK_LATEST.equals(ViaFabricPlus.api().targetVersion()) && this.minecraft.player != null && this.minecraft.level != null) {
+        if (Features.BLOCK_BREAKING.isActive() && this.minecraft.player != null && this.minecraft.level != null) {
             BedrockBlockBreak.onDestroyBlock(this.minecraft.player, this.minecraft.level, pos);
         }
     }

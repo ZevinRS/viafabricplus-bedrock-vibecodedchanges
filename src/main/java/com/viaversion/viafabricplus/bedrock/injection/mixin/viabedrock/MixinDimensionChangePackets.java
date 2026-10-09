@@ -22,6 +22,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.bedrock.building.BedrockDimensionChange;
@@ -41,7 +42,11 @@ public abstract class MixinDimensionChangePackets {
 
     @WrapOperation(method = "lambda$register$2", at = @At(value = "INVOKE", target = "Lnet/raphimc/viabedrock/api/util/PacketFactory;sendBedrockLoadingScreen(Lcom/viaversion/viaversion/api/connection/UserConnection;Lnet/raphimc/viabedrock/protocol/data/enums/bedrock/generated/ServerboundLoadingScreenPacketType;Ljava/lang/Long;)V"))
     private static void startLoadingScreenLater(final UserConnection user, final ServerboundLoadingScreenPacketType type, final Long loadingScreenId, final Operation<Void> original) {
-        BedrockDimensionChange.onChangeDimension(user, loadingScreenId);
+        if (Features.DIMENSION_CHANGE.isEnabled()) {
+            BedrockDimensionChange.onChangeDimension(user, loadingScreenId);
+        } else {
+            original.call(user, type, loadingScreenId);
+        }
     }
 
 }

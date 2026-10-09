@@ -73,15 +73,17 @@ public final class BedrockEntityModels {
 
         private final ResourcePackStorage packs;
         private final CustomEntity entity;
+        private final String identifier;
         private final List<Part> parts;
         private final BedrockAnimator animator;
         double distanceMoved;
         double lastYaw = Double.NaN;
         @Nullable Vec3 lastPosition;
 
-        Instance(final ResourcePackStorage packs, final CustomEntity entity, final List<Part> parts, final BedrockAnimator animator) {
+        Instance(final ResourcePackStorage packs, final CustomEntity entity, final String identifier, final List<Part> parts, final BedrockAnimator animator) {
             this.packs = packs;
             this.entity = entity;
+            this.identifier = identifier;
             this.parts = parts;
             this.animator = animator;
         }
@@ -92,6 +94,13 @@ public final class BedrockEntityModels {
 
         public CustomEntity entity() {
             return this.entity;
+        }
+
+        /**
+         * @return the custom entity's Bedrock identifier
+         */
+        public String identifier() {
+            return this.identifier;
         }
 
         public List<Part> parts() {
@@ -129,7 +138,7 @@ public final class BedrockEntityModels {
         }
         final Instance previous = INSTANCES.get(entity.javaId());
         final BedrockAnimator animator = previous != null && previous.entity == entity ? previous.animator : new BedrockAnimator(index, description);
-        INSTANCES.put(entity.javaId(), new Instance(packs, entity, List.copyOf(parts), animator));
+        INSTANCES.put(entity.javaId(), new Instance(packs, entity, identifier, List.copyOf(parts), animator));
         return true;
     }
 

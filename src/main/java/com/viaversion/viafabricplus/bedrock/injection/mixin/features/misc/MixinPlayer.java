@@ -21,8 +21,8 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.misc;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
-import com.viaversion.viafabricplus.bedrock.building.BedrockBuilding;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
@@ -41,19 +41,19 @@ public abstract class MixinPlayer {
      */
     @WrapWithCondition(method = "causeExtraKnockback", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Player;setDeltaMovement(Lnet/minecraft/world/phys/Vec3;)V"))
     private boolean skipJavaAttackSlowdown(final Player instance, final Vec3 deltaMovement) {
-        return !BedrockBuilding.isActive();
+        return !Features.ATTACK_SLOWDOWN.isActive();
     }
 
     @WrapWithCondition(method = "causeExtraKnockback", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Player;setSprinting(Z)V"))
     private boolean skipJavaAttackSprintReset(final Player instance, final boolean sprinting) {
-        return !BedrockBuilding.isActive();
+        return !Features.ATTACK_SLOWDOWN.isActive();
     }
 
     @Inject(method = "blockInteractionRange", at = @At("HEAD"), cancellable = true)
     private void bedrockPickRange(final CallbackInfoReturnable<Double> cir) {
         final Player player = (Player) (Object) this;
-        if (player instanceof LocalPlayer && BedrockBuilding.isActive()) {
-            cir.setReturnValue(player.hasInfiniteMaterials() ? BedrockBuilding.CREATIVE_PICK_RANGE : BedrockBuilding.SURVIVAL_PICK_RANGE);
+        if (player instanceof LocalPlayer && Features.REACH.isActive()) {
+            cir.setReturnValue(player.hasInfiniteMaterials() ? Features.CREATIVE_BLOCK_REACH.get() : Features.SURVIVAL_BLOCK_REACH.get());
         }
     }
 
@@ -64,8 +64,8 @@ public abstract class MixinPlayer {
     @Inject(method = "entityInteractionRange", at = @At("HEAD"), cancellable = true)
     private void bedrockAttackRange(final CallbackInfoReturnable<Double> cir) {
         final Player player = (Player) (Object) this;
-        if (player instanceof LocalPlayer && BedrockBuilding.isActive()) {
-            cir.setReturnValue(player.hasInfiniteMaterials() ? BedrockBuilding.CREATIVE_ATTACK_RANGE : BedrockBuilding.SURVIVAL_ATTACK_RANGE);
+        if (player instanceof LocalPlayer && Features.REACH.isActive()) {
+            cir.setReturnValue(player.hasInfiniteMaterials() ? Features.CREATIVE_ENTITY_REACH.get() : Features.SURVIVAL_ENTITY_REACH.get());
         }
     }
 

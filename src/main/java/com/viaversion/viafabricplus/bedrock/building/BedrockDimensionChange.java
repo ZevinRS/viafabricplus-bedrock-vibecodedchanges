@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.building;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import net.minecraft.client.Minecraft;
@@ -51,13 +52,8 @@ import org.jetbrains.annotations.Nullable;
  */
 public final class BedrockDimensionChange {
 
-    // The Bedrock client starts the loading screen 110 to 160 ms after the change arrived
-    private static final int START_DELAY_TICKS = 2;
-    // and ends it at the earliest 60 ms later
-    private static final int MIN_LOADING_TICKS = 2;
-    private static final int ACK_DELAY_TICKS = 7;
-    // Gives up waiting for the server's acknowledgement or the area to load
-    private static final int TIMEOUT_TICKS = 200;
+    // The Bedrock client starts the loading screen 110 to 160 ms after the change arrived and ends it at the earliest
+    // 60 ms later, see Features.DIMENSION_CHANGE for the ticks
 
     // Counted on the network thread, since packets and tasks reach the render thread in separate queues
     private static final AtomicInteger CHANGES = new AtomicInteger();
@@ -121,7 +117,7 @@ public final class BedrockDimensionChange {
             loading = true;
             started = false;
             ended = false;
-            startTick = ticks + START_DELAY_TICKS;
+            startTick = ticks + Features.START_DELAY_TICKS.get();
         } else if (ended) {
             // Another change after the loading screen ended waits for its own loading
             ended = false;
@@ -147,10 +143,10 @@ public final class BedrockDimensionChange {
         }
         final int changes = CHANGES.get();
         final boolean acknowledged = handledChanges >= changes && SERVER_ACKS.get() >= changes;
-        final boolean timedOut = ticks - startTick > TIMEOUT_TICKS;
-        if (!ended && (acknowledged && minecraft.getConnection().hasClientLoaded() && ticks >= startTick + MIN_LOADING_TICKS || timedOut)) {
+        final boolean timedOut = ticks - startTick > Features.TIMEOUT_TICKS.get();
+        if (!ended && (acknowledged && minecraft.getConnection().hasClientLoaded() && ticks >= startTick + Features.MIN_LOADING_TICKS.get() || timedOut)) {
             ended = true;
-            ackTick = ticks + ACK_DELAY_TICKS;
+            ackTick = ticks + Features.ACK_DELAY_TICKS.get();
             send(() -> PacketFactory.sendBedrockLoadingScreen(user, ServerboundLoadingScreenPacketType.EndLoadingScreen, loadingScreenId));
         }
         if (ended && ticks >= ackTick) {

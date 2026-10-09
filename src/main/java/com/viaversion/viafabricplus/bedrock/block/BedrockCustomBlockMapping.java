@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.block;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.google.common.collect.BiMap;
 import com.viaversion.nbt.tag.CompoundTag;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
@@ -59,6 +60,10 @@ public final class BedrockCustomBlockMapping {
      */
     public static void onPaletteBuilt(final UserConnection user, final IBlockStateRewriter rewriter) {
         final ResourcePackStorage packs = user.get(ResourcePackStorage.class);
+        if (!Features.CUSTOM_BLOCKS.isEnabled()) {
+            BedrockCustomBlocks.setDefinitions(new BedrockCustomBlockDefinition[BedrockCustomBlocks.FULL_BLOCKS], new BedrockCustomBlockDefinition[BedrockCustomBlocks.SHAPED_BLOCKS]);
+            return;
+        }
         assign(rewriter.viaFabricPlusBedrock$getBlockProperties(), rewriter.viaFabricPlusBedrock$getBedrockStates(), rewriter.viaFabricPlusBedrock$getJavaStates(), packs);
         if (packs != null && BedrockCustomBlocks.hasDefinitions()) {
             BedrockCustomBlockPack.build(packs);

@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.viaversion.viafabricplus.bedrock.inventory.BedrockInventoryTranslator;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import java.util.List;
@@ -41,7 +42,7 @@ public abstract class MixinInteractionPackets {
 
     @Inject(method = "handlePlayerAction", at = @At("HEAD"), cancellable = true)
     private static void dropHeldItem(final PacketWrapper wrapper, final PlayerActionAction action, final CallbackInfoReturnable<Boolean> cir) {
-        if ((action == PlayerActionAction.DROP_ITEM || action == PlayerActionAction.DROP_ALL_ITEMS)
+        if ((action == PlayerActionAction.DROP_ITEM || action == PlayerActionAction.DROP_ALL_ITEMS) && Features.INVENTORY_TRANSACTIONS.isEnabled()
             && BedrockInventoryTranslator.dropHeldItem(wrapper.user(), action == PlayerActionAction.DROP_ALL_ITEMS)) {
             cir.setReturnValue(true);
         }

@@ -21,12 +21,12 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.misc;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
-import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.ServerboundBedrockPackets;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.InteractPacketPayload_Action;
@@ -42,7 +42,7 @@ public abstract class MixinInventoryScreen {
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void sendBedrockPacket(final CallbackInfo ci) {
-        if (!ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (!Features.INVENTORY_TRANSACTIONS.isActive()) {
             return;
         }
 

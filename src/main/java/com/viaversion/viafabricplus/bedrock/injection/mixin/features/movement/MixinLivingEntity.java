@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.building.BedrockAuthInput;
@@ -39,7 +40,6 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
-import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -71,12 +71,11 @@ public abstract class MixinLivingEntity {
      */
     @Inject(method = "travel", at = @At("HEAD"), cancellable = true)
     private void stayWhileImmobile(final Vec3 input, final CallbackInfo ci) {
-        if ((Object) this == Minecraft.getInstance().player && (BedrockImmobile.isImmobile() || BedrockDimensionChange.isLoading())
-            && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if ((Object) this == Minecraft.getInstance().player && (BedrockImmobile.isImmobile() && Features.IMMOBILE.isActive()
+            || BedrockDimensionChange.isLoading() && Features.DIMENSION_CHANGE.isActive())) {
             ((LivingEntity) (Object) this).setDeltaMovement(Vec3.ZERO);
             ci.cancel();
-        } else if ((Object) this == Minecraft.getInstance().player && BedrockImmobile.takeTeleported()
-            && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        } else if ((Object) this == Minecraft.getInstance().player && BedrockImmobile.takeTeleported() && Features.IMMOBILE.isActive()) {
             ci.cancel();
         }
     }
@@ -94,7 +93,7 @@ public abstract class MixinLivingEntity {
      */
     @Inject(method = "setSprinting", at = @At("HEAD"))
     private void computeSpeedAgain(final boolean sprinting, final CallbackInfo ci) {
-        if ((Object) this != Minecraft.getInstance().player || !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if ((Object) this != Minecraft.getInstance().player || !Features.SPRINT.isActive()) {
             return;
         }
         if (sprinting != ((LivingEntity) (Object) this).isSprinting()) {
@@ -108,7 +107,7 @@ public abstract class MixinLivingEntity {
 
     @Redirect(method = "getFluidFallingAdjustedMovement", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;isSprinting()Z"))
     private boolean changeFluidGravityCondition(final LivingEntity instance) {
-        return ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) ? instance.isSwimming() : instance.isSprinting();
+        return Features.MOVEMENT_PHYSICS.isActive() ? instance.isSwimming() : instance.isSprinting();
     }
 
     /**
@@ -119,7 +118,7 @@ public abstract class MixinLivingEntity {
     @ModifyArg(method = "handleRelativeFrictionAndCalculateMovement", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;getFrictionInfluencedSpeed(F)F"))
     private float soulSandFriction(final float friction) {
         final LivingEntity entity = (LivingEntity) (Object) this;
-        if (entity.onGround() && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)
+        if (entity.onGround() && Features.MOVEMENT_PHYSICS.isActive()
             && entity.level().getBlockState(entity.getBlockPosBelowThatAffectsMyMovement()).is(Blocks.SOUL_SAND)) {
             return friction * 1.225F;
         }
@@ -129,13 +128,13 @@ public abstract class MixinLivingEntity {
     // Bedrock slows the player in lava the same way however deep it is, as recorded when swimming up out of lava
     @ModifyExpressionValue(method = "travelInLava", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;isInShallowFluid(Lnet/minecraft/tags/TagKey;)Z"))
     private boolean noShallowLava(final boolean shallow) {
-        return !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) && shallow;
+        return !Features.MOVEMENT_PHYSICS.isActive() && shallow;
     }
 
     @Inject(method = "getFluidFallingAdjustedMovement", at = @At("HEAD"), cancellable = true)
     private void applyLevitationVelocity(final double baseGravity, final boolean isFalling, final Vec3 movement, final CallbackInfoReturnable<Vec3> cir) {
         final MobEffectInstance effect = this.getEffect(MobEffects.LEVITATION);
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) && effect != null) {
+        if (Features.MOVEMENT_PHYSICS.isActive() && effect != null) {
             cir.setReturnValue(new Vec3(movement.x, movement.y + (((effect.getAmplifier() + 1) * 0.05) - movement.y) * 0.2, movement.z));
         }
     }

@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.building;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -41,13 +42,6 @@ import net.minecraft.world.phys.Vec3;
  * packets are held back until the client sent the input before that move. Only used on the render thread.
  */
 public final class BedrockPacketDelay {
-
-    // How many moves after the last sent input the update is first used for
-    public static final int ATTRIBUTE_MOVES = 3;
-    public static final int MOTION_MOVES = 2;
-    public static final int ENTITY_DATA_MOVES = 2;
-    // The answer to the server's latency check, which the Bedrock client sends when it handles the packets
-    public static final int LATENCY_MOVES = 2;
 
     private static final Deque<Pending<?>> PENDING = new ArrayDeque<>();
     private static boolean applying;
@@ -74,7 +68,7 @@ public final class BedrockPacketDelay {
      * @return whether the packet was held back
      */
     public static <T extends Packet<?>> boolean hold(final T packet, final int moves, final BiConsumer<ClientPacketListener, T> handler) {
-        if (applying || Minecraft.getInstance().player == null) {
+        if (applying || Minecraft.getInstance().player == null || !Features.PACKET_DELAY.isEnabled()) {
             return false;
         }
         // Applied at the end of the tick that sends the input before the move it is used for
@@ -124,9 +118,11 @@ public final class BedrockPacketDelay {
             PENDING.clear();
             return;
         }
-        // Each kind of update has its own delay, so a later packet can be due before an earlier one
+        // Each kind of update has its own delay, so a later packet can be due before an earlier one. Turning the delay
+        // off applies the held packets right away.
+        final boolean delaying = Features.PACKET_DELAY.isEnabled();
         final List<Pending<?>> due = new ArrayList<>();
-        PENDING.removeIf(pending -> pending.dueTick <= sentTicks && due.add(pending));
+        PENDING.removeIf(pending -> (!delaying || pending.dueTick <= sentTicks) && due.add(pending));
         applying = true;
         try {
             for (final Pending<?> pending : due) {

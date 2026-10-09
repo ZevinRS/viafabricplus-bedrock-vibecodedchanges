@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -30,7 +31,6 @@ import com.viaversion.viafabricplus.bedrock.building.BedrockSprint;
 import com.viaversion.viafabricplus.bedrock.building.BedrockAuthInput;
 import com.viaversion.viafabricplus.bedrock.building.BedrockItemUse;
 import net.minecraft.client.player.LocalPlayer;
-import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.PlayerAuthInputData;
 import net.raphimc.viabedrock.api.model.entity.ClientPlayerEntity;
@@ -57,7 +57,7 @@ public abstract class MixinLocalPlayer {
      */
     @Redirect(method = {"shouldStopRunSprinting", "canStartSprinting"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;isSprintingPossible(Z)Z"))
     private boolean bedrockWaterSprinting(final LocalPlayer instance, final boolean allowedInShallowWater) {
-        if (!ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (!Features.SPRINT.isActive()) {
             return this.isSprintingPossible(allowedInShallowWater);
         }
         // Bedrock still counts the player in the water in the tick it got out, as recorded when climbing out of water
@@ -72,7 +72,7 @@ public abstract class MixinLocalPlayer {
      */
     @Inject(method = {"shouldStopRunSprinting", "shouldStopSwimSprinting"}, at = @At("HEAD"), cancellable = true)
     private void keepSprintingWhileLoading(final CallbackInfoReturnable<Boolean> cir) {
-        if (BedrockDimensionChange.isLoading() && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (BedrockDimensionChange.isLoading() && Features.DIMENSION_CHANGE.isActive()) {
             cir.setReturnValue(false);
         }
     }
@@ -86,7 +86,7 @@ public abstract class MixinLocalPlayer {
     private void prepareAuthInput(final CallbackInfo ci) {
         BedrockAuthInput.setVelocity(((LocalPlayer) (Object) this).getDeltaMovement());
         final UserConnection connection = ViaFabricPlus.api().userConnection();
-        if (connection == null || !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (connection == null || !Features.SPRINT.isActive()) {
             return;
         }
         final ClientPlayerEntity player = connection.get(EntityTracker.class).getClientPlayer();
@@ -101,7 +101,7 @@ public abstract class MixinLocalPlayer {
     // Pressing back doesn't cancel a double tap of forward to sprint on Bedrock, as recorded with forward and back held for a tick
     @ModifyExpressionValue(method = "aiStep", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Input;backward()Z"))
     private boolean keepSprintDoubleTap(final boolean backward) {
-        return !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) && backward;
+        return !Features.SPRINT.isActive() && backward;
     }
 
     /**
@@ -111,7 +111,7 @@ public abstract class MixinLocalPlayer {
      */
     @WrapOperation(method = "isMovingSlowly", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;isVisuallyCrawling()Z"))
     private boolean crawlOnlyWhileSwimming(final LocalPlayer instance, final Operation<Boolean> original) {
-        return original.call(instance) && (!ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) || instance.isSwimming());
+        return original.call(instance) && (!Features.MOVEMENT_PHYSICS.isActive() || instance.isSwimming());
     }
 
     /**
@@ -120,7 +120,7 @@ public abstract class MixinLocalPlayer {
      */
     @Inject(method = "aiStep", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/AbstractClientPlayer;aiStep()V"))
     private void swimAfterSprintStart(final CallbackInfo ci) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (Features.MOVEMENT_PHYSICS.isActive()) {
             ((LocalPlayer) (Object) this).updateSwimming();
         }
     }
@@ -132,12 +132,12 @@ public abstract class MixinLocalPlayer {
      */
     @ModifyExpressionValue(method = "shouldStopRunSprinting", at = @At(value = "FIELD", target = "Lnet/minecraft/client/player/LocalPlayer;horizontalCollision:Z"))
     private boolean bedrockSprintCollision(final boolean horizontalCollision) {
-        return ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) ? BedrockSprint.isMainAxisBlocked() : horizontalCollision;
+        return Features.SPRINT.isActive() ? BedrockSprint.isMainAxisBlocked() : horizontalCollision;
     }
 
     @ModifyExpressionValue(method = "shouldStopRunSprinting", at = @At(value = "FIELD", target = "Lnet/minecraft/client/player/LocalPlayer;minorHorizontalCollision:Z"))
     private boolean noMinorCollisionOnBedrock(final boolean minorHorizontalCollision) {
-        return !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) && minorHorizontalCollision;
+        return !Features.SPRINT.isActive() && minorHorizontalCollision;
     }
 
     /**
@@ -146,7 +146,7 @@ public abstract class MixinLocalPlayer {
      */
     @WrapOperation(method = "modifyInput", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;modifyInputSpeedForSquareMovement(Lnet/minecraft/world/phys/Vec2;)Lnet/minecraft/world/phys/Vec2;"))
     private Vec2 keepBedrockDiagonalInput(final Vec2 input, final Operation<Vec2> original) {
-        return ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST) ? input : original.call(input);
+        return Features.SPRINT.isActive() ? input : original.call(input);
     }
 
     @Inject(method = "modifyInput", at = @At("HEAD"))
@@ -160,8 +160,8 @@ public abstract class MixinLocalPlayer {
      */
     @Inject(method = "itemUseSpeedMultiplier", at = @At("HEAD"), cancellable = true)
     private void bedrockItemUseSpeed(final CallbackInfoReturnable<Float> cir) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
-            cir.setReturnValue(BedrockItemUse.ITEM_USE_SPEED_MULTIPLIER);
+        if (Features.AUTH_INPUT.isActive()) {
+            cir.setReturnValue(Features.ITEM_USE_SPEED.get().floatValue());
         }
     }
 

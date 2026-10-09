@@ -24,6 +24,7 @@ package com.viaversion.viafabricplus.bedrock;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.api.entrypoint.ViaFabricPlusEntrypoint;
 import com.viaversion.viafabricplus.bedrock.account.BedrockAccount;
+import com.viaversion.viafabricplus.bedrock.feature.BedrockApiImpl;
 import com.viaversion.viafabricplus.bedrock.friends.FriendWorldSkinProvider;
 import com.viaversion.viafabricplus.bedrock.protocoltranslator.platform.ViaFabricPlusNettyPipelineProvider;
 import com.viaversion.viafabricplus.bedrock.protocoltranslator.platform.ViaFabricPlusViaBedrockPlatform;
@@ -58,6 +59,7 @@ public final class ViaFabricPlusBedrock implements ViaFabricPlusEntrypoint {
         new ViaFabricPlusViaBedrockPlatform();
         Via.getManager().getProviders().use(NettyPipelineProvider.class, new ViaFabricPlusNettyPipelineProvider());
         Via.getManager().getProviders().use(SkinProvider.class, new FriendWorldSkinProvider());
+        BedrockApiImpl.INSTANCE.callEntrypoints();
     }
 
     public static ViaFabricPlusBedrock impl() {

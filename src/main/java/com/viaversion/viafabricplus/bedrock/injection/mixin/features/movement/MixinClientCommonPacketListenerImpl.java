@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.building.BedrockPacketDelay;
 import net.minecraft.client.multiplayer.ClientCommonPacketListenerImpl;
@@ -43,7 +44,7 @@ public abstract class MixinClientCommonPacketListenerImpl {
     @Inject(method = "handlePing", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/protocol/PacketUtils;ensureRunningOnSameThread(Lnet/minecraft/network/protocol/Packet;Lnet/minecraft/network/PacketListener;Lnet/minecraft/network/PacketProcessor;)V", shift = At.Shift.AFTER), cancellable = true)
     private void answerLatencyCheckLater(final ClientboundPingPacket packet, final CallbackInfo ci) {
         if ((Object) this instanceof ClientPacketListener && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)
-            && BedrockPacketDelay.hold(packet, BedrockPacketDelay.LATENCY_MOVES, ClientPacketListener::handlePing)) {
+            && BedrockPacketDelay.hold(packet, Features.LATENCY_MOVES.get(), ClientPacketListener::handlePing)) {
             ci.cancel();
         }
     }

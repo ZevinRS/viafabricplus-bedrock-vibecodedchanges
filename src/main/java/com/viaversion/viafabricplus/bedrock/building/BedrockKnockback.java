@@ -21,10 +21,11 @@
 
 package com.viaversion.viafabricplus.bedrock.building;
 
+import com.viaversion.viafabricplus.bedrock.feature.SwitchableHandlers;
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.Vector3d;
-import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -48,14 +49,13 @@ public final class BedrockKnockback {
 
     // The tick each motion of the client player started at, 0 if the server doesn't say, in the order they arrive
     private static final Queue<Long> MOTION_TICKS = new ConcurrentLinkedQueue<>();
-    private static final int MAX_REPLAYED_TICKS = 20;
 
     private BedrockKnockback() {
     }
 
     public static void register(final BedrockProtocol protocol) {
         // ViaBedrock's translation, which drops the tick
-        protocol.replaceClientbound(ClientboundBedrockPackets.SET_ENTITY_MOTION, wrapper -> {
+        SwitchableHandlers.replaceClientbound(protocol, ClientboundBedrockPackets.SET_ENTITY_MOTION, Features.KNOCKBACK_REPLAY, wrapper -> {
             final EntityTracker entityTracker = wrapper.user().get(EntityTracker.class);
 
             final long entityRuntimeId = wrapper.read(BedrockTypes.UNSIGNED_VAR_LONG); // entity runtime id
@@ -91,7 +91,7 @@ public final class BedrockKnockback {
         // The last sent tick, the next movement is of the tick after it
         final long lastTick = user.get(EntityTracker.class).getClientPlayer().age();
         final long missedTicks = lastTick - tick;
-        if (missedTicks <= 0 || missedTicks > MAX_REPLAYED_TICKS) {
+        if (missedTicks <= 0 || missedTicks > Features.MAX_REPLAYED_TICKS.get()) {
             return;
         }
         for (int i = 0; i < missedTicks; i++) {

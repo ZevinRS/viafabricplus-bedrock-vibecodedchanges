@@ -111,6 +111,16 @@ public final class BedrockSkins {
             return this.geometry;
         }
 
+        /**
+         * @return the skin as the API gives it
+         */
+        public com.viaversion.viafabricplus.bedrock.api.BedrockSkin api() {
+            final BedrockGeometry geometry = this.parseGeometry();
+            return new com.viaversion.viafabricplus.bedrock.api.BedrockSkin(this.data.skinData(), this.data.capeData() != null && this.data.capeData().getWidth() > 1
+                ? this.data.capeData() : null, this.geometryName(), this.data.geometryData() != null ? this.data.geometryData() : "", this.slim(),
+                geometry != null && reshapes(geometry));
+        }
+
         public boolean slim() {
             return this.data.armSize().equalsIgnoreCase("slim") || this.geometryName().toLowerCase(Locale.ROOT).contains("slim");
         }

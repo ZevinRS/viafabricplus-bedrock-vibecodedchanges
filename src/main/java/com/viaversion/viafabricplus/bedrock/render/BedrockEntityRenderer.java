@@ -21,6 +21,9 @@
 
 package com.viaversion.viafabricplus.bedrock.render;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
+import com.viaversion.viafabricplus.bedrock.feature.BedrockApiImpl;
+import com.viaversion.viafabricplus.bedrock.api.MoLangQuery;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
@@ -90,7 +93,8 @@ public final class BedrockEntityRenderer extends EntityRenderer<Interaction, Bed
         }
         state.yaw = entity.getYRot(partialTicks);
         try {
-            final BedrockModel.Pose pose = instance.animator().update(System.nanoTime() / 1.0E9, query -> this.queries(entity, instance, partialTicks, state.yaw, query));
+            final BedrockModel.Pose pose = Features.ENTITY_ANIMATIONS.isEnabled()
+                ? instance.animator().update(System.nanoTime() / 1.0E9, query -> this.queries(entity, instance, partialTicks, state.yaw, query)) : BedrockModel.Pose.NONE;
             for (final BedrockEntityModels.Part part : instance.parts()) {
                 final RenderType renderType = BedrockEntityModels.renderType(instance.packs(), part);
                 if (renderType != null) {
@@ -180,6 +184,18 @@ public final class BedrockEntityRenderer extends EntityRenderer<Interaction, Bed
             return Value.of(axis == 0 ? cameraPitch : cameraYaw);
         });
         query.set("property", (Function<Object>) (context, arguments) -> Value.of(0));
+
+        // Queries other mods add through the API, which replace built-in ones of the same name
+        for (final Map.Entry<String, MoLangQuery> added : BedrockApiImpl.INSTANCE.queries().entrySet()) {
+            final MoLangQuery apiQuery = added.getValue();
+            query.set(added.getKey(), (Function<Object>) (context, arguments) -> {
+                final double[] values = new double[arguments.length()];
+                for (int i = 0; i < values.length; i++) {
+                    values[i] = arguments.next().eval().getAsNumber();
+                }
+                return Value.of(apiQuery.evaluate(entity, instance.identifier(), partialTicks, values));
+            });
+        }
     }
 
     public static final class State extends EntityRenderState {

@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.render;
 
+import com.viaversion.viafabricplus.bedrock.feature.Features;
 import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.injection.access.IEntityRenderState;
@@ -31,7 +32,6 @@ import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
-import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -62,7 +62,7 @@ public final class BedrockSkinRenderer extends AvatarRenderer<AbstractClientPlay
      * @return the renderer of a player's 4D skin, or null for Java's
      */
     public static @Nullable BedrockSkinRenderer of(final AbstractClientPlayer player) {
-        if (context == null || !ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (context == null || !Features.SKIN_GEOMETRY.isActive() || !Features.PLAYER_SKINS.isEnabled()) {
             return null;
         }
         final BedrockSkins.Skin skin = BedrockSkins.get(player.getUUID());
