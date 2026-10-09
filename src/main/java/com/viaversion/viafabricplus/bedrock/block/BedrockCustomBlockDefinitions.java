@@ -27,8 +27,6 @@ import com.viaversion.nbt.tag.ListTag;
 import com.viaversion.nbt.tag.NumberTag;
 import com.viaversion.nbt.tag.StringTag;
 import com.viaversion.nbt.tag.Tag;
-import com.viaversion.viaversion.libs.gson.JsonElement;
-import com.viaversion.viaversion.libs.gson.JsonObject;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -43,8 +41,7 @@ import team.unnamed.mocha.runtime.standard.MochaMath;
 
 /**
  * Works out what a block state a server defines is like, from its components in start_game: the components of the
- * block, replaced by those of every permutation whose condition holds for the state. Full blocks without components
- * for their look take their textures from the packs' blocks.json, like The Hive's bricks.
+ * block, replaced by those of every permutation whose condition holds for the state.
  */
 public final class BedrockCustomBlockDefinitions {
 
@@ -63,9 +60,8 @@ public final class BedrockCustomBlockDefinitions {
     /**
      * @param blockProperties the block's definition from start_game
      * @param states          the properties of the block state
-     * @param blocksJson      the block's entry in the packs' blocks.json, if any
      */
-    public static BedrockCustomBlockDefinition create(final String name, final CompoundTag blockProperties, final CompoundTag states, final @Nullable JsonObject blocksJson) {
+    public static BedrockCustomBlockDefinition create(final String name, final CompoundTag blockProperties, final CompoundTag states) {
         final CompoundTag components = new CompoundTag();
         if (blockProperties.get("components") instanceof final CompoundTag base) {
             for (final Map.Entry<String, Tag> component : base.entrySet()) {
@@ -94,17 +90,6 @@ public final class BedrockCustomBlockDefinitions {
             for (final Map.Entry<String, Tag> material : materials.entrySet()) {
                 if (material.getValue() instanceof final CompoundTag instance && instance.getString("texture", null) != null) {
                     textures.put(material.getKey(), instance.getString("texture"));
-                }
-            }
-        }
-        if (textures.isEmpty() && blocksJson != null && blocksJson.get("textures") instanceof final JsonElement blocksTextures) {
-            if (blocksTextures.isJsonPrimitive()) {
-                textures.put("*", blocksTextures.getAsString());
-            } else if (blocksTextures instanceof final JsonObject faces) {
-                for (final Map.Entry<String, JsonElement> face : faces.entrySet()) {
-                    if (face.getValue().isJsonPrimitive()) {
-                        textures.put(face.getKey(), face.getValue().getAsString());
-                    }
                 }
             }
         }

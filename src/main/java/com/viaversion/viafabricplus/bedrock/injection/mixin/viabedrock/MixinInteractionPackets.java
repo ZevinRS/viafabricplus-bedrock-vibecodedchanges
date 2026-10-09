@@ -23,11 +23,17 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 
 import com.viaversion.viafabricplus.bedrock.inventory.BedrockInventoryTranslator;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
+import java.util.List;
+import net.raphimc.viabedrock.api.model.entity.Entity;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.PlayerActionAction;
+import net.raphimc.viabedrock.protocol.model.EntityLink;
 import net.raphimc.viabedrock.protocol.packet.InteractionPackets;
+import net.raphimc.viabedrock.protocol.storage.EntityTracker;
+import net.raphimc.viabedrock.protocol.types.BedrockTypes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = InteractionPackets.class, remap = false)
@@ -38,6 +44,28 @@ public abstract class MixinInteractionPackets {
         if ((action == PlayerActionAction.DROP_ITEM || action == PlayerActionAction.DROP_ALL_ITEMS)
             && BedrockInventoryTranslator.dropHeldItem(wrapper.user(), action == PlayerActionAction.DROP_ALL_ITEMS)) {
             cir.setReturnValue(true);
+        }
+    }
+
+    /**
+     * ViaBedrock keeps passengers that were removed and looked up entities of links without checking them, which
+     * disconnected with an exception when The Hive linked entities in its hub.
+     */
+    @Inject(method = "lambda$register$3", at = @At("HEAD"), cancellable = true)
+    private static void skipLinksToUnknownEntities(final PacketWrapper wrapper, final CallbackInfo ci) {
+        final EntityLink link = wrapper.read(BedrockTypes.ENTITY_LINK);
+        wrapper.resetReader();
+        final EntityTracker entityTracker = wrapper.user().get(EntityTracker.class);
+        final Entity vehicle = entityTracker.getEntityByUid(link.fromEntityUniqueId());
+        if (vehicle == null || entityTracker.getEntityByUid(link.toEntityUniqueId()) == null) {
+            wrapper.cancel();
+            ci.cancel();
+            return;
+        }
+        for (final long passenger : List.copyOf(vehicle.passengers())) {
+            if (entityTracker.getEntityByUid(passenger) == null) {
+                vehicle.removePassenger(passenger);
+            }
         }
     }
 

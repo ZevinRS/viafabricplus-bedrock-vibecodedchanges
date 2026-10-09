@@ -23,9 +23,14 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.sugar.Local;
+import com.viaversion.viafabricplus.bedrock.block.BedrockCustomBlockMapping;
+import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.libs.fastutil.ints.IntIntImmutablePair;
 import com.viaversion.viaversion.libs.fastutil.ints.IntIntPair;
+import net.raphimc.viabedrock.protocol.model.BlockProperties;
 import net.raphimc.viabedrock.protocol.packet.JoinPackets;
+import net.raphimc.viabedrock.protocol.rewriter.BlockStateRewriter;
 import net.raphimc.viabedrock.protocol.storage.GameSessionStorage;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -43,6 +48,18 @@ public abstract class MixinJoinPackets {
         final int minimumY = heightAndMinimum.rightInt();
         final int height = heightAndMinimum.leftInt();
         original.call(gameSession, dimension, new IntIntImmutablePair(minimumY, minimumY + height));
+    }
+
+    /**
+     * Makes the models of the blocks the server defined, once ViaBedrock built the block palette from them, see
+     * {@link BedrockCustomBlockMapping}.
+     */
+    @WrapOperation(method = "lambda$register$7", at = @At(value = "NEW", target = "net/raphimc/viabedrock/protocol/rewriter/BlockStateRewriter"))
+    private static BlockStateRewriter makeCustomBlockModels(final BlockProperties[] blockProperties, final boolean hashedRuntimeBlockIds, final Operation<BlockStateRewriter> original,
+                                                            @Local(argsOnly = true) final PacketWrapper wrapper) {
+        final BlockStateRewriter blockStateRewriter = original.call(blockProperties, hashedRuntimeBlockIds);
+        BedrockCustomBlockMapping.onPaletteBuilt(wrapper.user());
+        return blockStateRewriter;
     }
 
 }

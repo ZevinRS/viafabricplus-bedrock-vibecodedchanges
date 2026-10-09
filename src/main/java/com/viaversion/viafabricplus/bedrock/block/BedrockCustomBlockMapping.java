@@ -23,10 +23,8 @@ package com.viaversion.viafabricplus.bedrock.block;
 
 import com.google.common.collect.BiMap;
 import com.viaversion.nbt.tag.CompoundTag;
-import com.viaversion.viafabricplus.ViaFabricPlus;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.resourcepack.BedrockCustomBlockPack;
-import com.viaversion.viafabricplus.bedrock.resourcepack.BedrockPackIndex;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.libs.fastutil.ints.Int2IntMap;
 import java.util.ArrayList;
@@ -51,6 +49,17 @@ public final class BedrockCustomBlockMapping {
     }
 
     /**
+     * Called once ViaBedrock built the block palette of a server, with the server's packs: makes the models of the
+     * blocks it defined.
+     */
+    public static void onPaletteBuilt(final UserConnection user) {
+        final ResourcePackStorage packs = user.get(ResourcePackStorage.class);
+        if (packs != null && BedrockCustomBlocks.hasDefinitions()) {
+            BedrockCustomBlockPack.build(packs);
+        }
+    }
+
+    /**
      * Called when ViaBedrock built the block palette of a server.
      *
      * @param blockProperties     the blocks the server defined
@@ -72,9 +81,6 @@ public final class BedrockCustomBlockMapping {
             return;
         }
 
-        final UserConnection user = ViaFabricPlus.api().userConnection();
-        final ResourcePackStorage packs = user != null ? user.get(ResourcePackStorage.class) : null;
-        final BedrockPackIndex index = packs != null ? BedrockPackIndex.of(packs) : null;
         final List<Map.Entry<BlockState, Integer>> states = new ArrayList<>(bedrockStates.entrySet());
         states.sort(Comparator.comparingInt(Map.Entry::getValue));
         int fullCount = 0;
@@ -86,7 +92,7 @@ public final class BedrockCustomBlockMapping {
             }
             final String name = state.namespacedIdentifier();
             final CompoundTag stateProperties = state.blockStateTag().get("states") instanceof final CompoundTag tag ? tag : new CompoundTag();
-            final BedrockCustomBlockDefinition definition = BedrockCustomBlockDefinitions.create(name, customBlocks.get(name), stateProperties, index != null ? index.block(name) : null);
+            final BedrockCustomBlockDefinition definition = BedrockCustomBlockDefinitions.create(name, customBlocks.get(name), stateProperties);
             final Block block;
             if (BedrockCustomBlockDefinitions.isFullBlock(definition) && fullCount < full.length) {
                 full[fullCount] = definition;
@@ -103,9 +109,6 @@ public final class BedrockCustomBlockMapping {
         BedrockCustomBlocks.setDefinitions(full, shaped);
         ViaFabricPlusBedrock.impl().logger().info("Mapped the server's block states to {} full and {} shaped blocks{}", fullCount, shapedCount,
             unassigned > 0 ? ", " + unassigned + " didn't fit" : "");
-        if (packs != null && fullCount + shapedCount > 0) {
-            BedrockCustomBlockPack.build(packs, full, shaped);
-        }
     }
 
 }

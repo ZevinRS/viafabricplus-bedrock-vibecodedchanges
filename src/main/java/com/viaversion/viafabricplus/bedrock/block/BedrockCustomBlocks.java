@@ -87,6 +87,18 @@ public final class BedrockCustomBlocks implements ModInitializer {
         return SHAPED.get(index);
     }
 
+    public static boolean hasDefinitions() {
+        return fullDefinitions[0] != null || shapedDefinitions[0] != null;
+    }
+
+    public static BedrockCustomBlockDefinition[] fullDefinitions() {
+        return fullDefinitions;
+    }
+
+    public static BedrockCustomBlockDefinition[] shapedDefinitions() {
+        return shapedDefinitions;
+    }
+
     public static @Nullable BedrockCustomBlockDefinition fullDefinition(final int index) {
         return fullDefinitions[index];
     }

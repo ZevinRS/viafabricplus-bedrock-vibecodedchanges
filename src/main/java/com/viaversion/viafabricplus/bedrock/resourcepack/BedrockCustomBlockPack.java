@@ -24,6 +24,7 @@ package com.viaversion.viafabricplus.bedrock.resourcepack;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.block.BedrockCustomBlockDefinition;
 import com.viaversion.viafabricplus.bedrock.block.BedrockCustomBlocks;
+import com.viaversion.viaversion.libs.gson.JsonElement;
 import com.viaversion.viaversion.libs.gson.JsonObject;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -58,31 +59,43 @@ public final class BedrockCustomBlockPack {
     private BedrockCustomBlockPack() {
     }
 
-    public static void build(final ResourcePackStorage packs, final BedrockCustomBlockDefinition[] full, final BedrockCustomBlockDefinition[] shaped) {
+    public static void build(final ResourcePackStorage packs) {
+        final BedrockCustomBlockDefinition[] full = BedrockCustomBlocks.fullDefinitions();
+        final BedrockCustomBlockDefinition[] shaped = BedrockCustomBlocks.shapedDefinitions();
         CompletableFuture.runAsync(() -> {
             try {
                 final Content content = new InMemoryContent();
                 final Map<String, String> textures = new HashMap<>();
                 final JsonObject lang = new JsonObject();
                 for (int i = 0; i < full.length && full[i] != null; i++) {
-                    addBlock(content, packs, textures, lang, BedrockCustomBlocks.fullBlock(i), full[i]);
+                    addBlockSafely(content, packs, textures, lang, BedrockCustomBlocks.fullBlock(i), full[i]);
                 }
                 for (int i = 0; i < shaped.length && shaped[i] != null; i++) {
-                    addBlock(content, packs, textures, lang, BedrockCustomBlocks.shapedBlock(i), shaped[i]);
+                    addBlockSafely(content, packs, textures, lang, BedrockCustomBlocks.shapedBlock(i), shaped[i]);
                 }
                 content.putJson("assets/" + BedrockCustomBlocks.NAMESPACE + "/lang/en_us.json", lang);
                 content.putJson("pack.mcmeta", manifest());
                 final Path file = Files.createTempFile("viafabricplus-bedrock-blocks", ".zip");
                 file.toFile().deleteOnExit();
                 Files.write(file, content.toZip());
+                ViaFabricPlusBedrock.impl().logger().info("Made the models of the server's blocks, {} textures", textures.size());
                 Minecraft.getInstance().execute(() -> {
                     Minecraft.getInstance().getDownloadedPackSource().popPack(PACK_ID);
                     Minecraft.getInstance().getDownloadedPackSource().pushLocalPack(PACK_ID, file);
                 });
-            } catch (final Exception e) {
+            } catch (final Throwable e) {
                 ViaFabricPlusBedrock.impl().logger().error("Failed to make the models of the server's blocks", e);
             }
         });
+    }
+
+    private static void addBlockSafely(final Content content, final ResourcePackStorage packs, final Map<String, String> textures, final JsonObject lang,
+                                       final Block block, final BedrockCustomBlockDefinition definition) {
+        try {
+            addBlock(content, packs, textures, lang, block, definition);
+        } catch (final Throwable e) {
+            ViaFabricPlusBedrock.impl().logger().error("Failed to make the model of {}", definition.name(), e);
+        }
     }
 
     private static void addBlock(final Content content, final ResourcePackStorage packs, final Map<String, String> textures, final JsonObject lang,
@@ -91,9 +104,10 @@ public final class BedrockCustomBlockPack {
         final String model = BedrockCustomBlocks.NAMESPACE + ":block/" + path;
         final String assets = "assets/" + BedrockCustomBlocks.NAMESPACE + "/";
 
+        final Map<String, String> shortNames = definition.textures().isEmpty() ? blocksJsonTextures(packs, definition.name()) : definition.textures();
         final Map<Direction, String> faceTextures = new EnumMap<>(Direction.class);
         for (final Direction direction : Direction.values()) {
-            final String texture = texture(content, packs, textures, faceTexture(definition, direction));
+            final String texture = texture(content, packs, textures, faceTexture(shortNames, direction));
             faceTextures.put(direction, texture != null ? texture : "minecraft:block/stone");
         }
 
@@ -145,10 +159,30 @@ public final class BedrockCustomBlockPack {
     }
 
     /**
+     * Full blocks without components for their look, like The Hive's bricks, have their textures in the packs'
+     * blocks.json: one for all faces or one per face.
+     */
+    private static Map<String, String> blocksJsonTextures(final ResourcePackStorage packs, final String name) {
+        final Map<String, String> textures = new HashMap<>();
+        final JsonObject block = BedrockPackIndex.of(packs).block(name);
+        if (block != null && block.get("textures") instanceof final JsonElement blockTextures) {
+            if (blockTextures.isJsonPrimitive()) {
+                textures.put("*", blockTextures.getAsString());
+            } else if (blockTextures instanceof final JsonObject faces) {
+                for (final Map.Entry<String, JsonElement> face : faces.entrySet()) {
+                    if (face.getValue().isJsonPrimitive()) {
+                        textures.put(face.getKey(), face.getValue().getAsString());
+                    }
+                }
+            }
+        }
+        return textures;
+    }
+
+    /**
      * @return the texture short name of a face: its own, then side for the sides, then the one for all faces
      */
-    private static @Nullable String faceTexture(final BedrockCustomBlockDefinition definition, final Direction direction) {
-        final Map<String, String> textures = definition.textures();
+    private static @Nullable String faceTexture(final Map<String, String> textures, final Direction direction) {
         final String face = direction.name().toLowerCase(Locale.ROOT);
         if (textures.containsKey(face)) {
             return textures.get(face);

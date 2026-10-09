@@ -160,7 +160,7 @@ public final class BedrockEntityPoses {
     /**
      * The pose of the bones at the start of the animations an entity plays by default: the ones its scripts animate
      * without a condition or with one that holds at rest, and the ones the first state of its animation controllers
-     * plays.
+     * plays, like the idle pose of The Hive's hub NPCs.
      */
     private static Map<String, BonePose> defaultPose(final ResourcePackStorage storage, final String entityIdentifier) {
         final BedrockPackIndex index = BedrockPackIndex.of(storage);
@@ -175,8 +175,19 @@ public final class BedrockEntityPoses {
         if (scripts != null && scripts.get("animate") instanceof final JsonArray animate) {
             collectEntries(animate, animated);
         }
+        // The older list of controllers, each a name and the controller's identifier
         if (description.get("animation_controllers") instanceof final JsonArray controllers) {
-            collectEntries(controllers, animated);
+            for (final JsonElement controller : controllers) {
+                if (controller.isJsonPrimitive()) {
+                    animated.add(controller.getAsString());
+                } else if (controller instanceof final JsonObject named) {
+                    for (final JsonElement identifier : named.asMap().values()) {
+                        if (identifier.isJsonPrimitive()) {
+                            animated.add(identifier.getAsString());
+                        }
+                    }
+                }
+            }
         }
 
         final Set<String> played = new HashSet<>();
