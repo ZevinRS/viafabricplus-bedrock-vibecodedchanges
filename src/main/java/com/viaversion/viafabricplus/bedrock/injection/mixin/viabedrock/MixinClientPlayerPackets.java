@@ -21,6 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.viabedrock;
 
+import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.viaversion.viafabricplus.bedrock.building.BedrockAuthInput;
@@ -136,6 +137,22 @@ public abstract class MixinClientPlayerPackets {
         } else {
             original.call(wrapper, type, value);
         }
+    }
+
+    @Unique
+    private static boolean viaFabricPlusBedrock$jumped;
+
+    @Inject(method = "lambda$register$18", at = @At("HEAD"))
+    private static void takeJump(final PacketWrapper wrapper, final CallbackInfo ci) {
+        viaFabricPlusBedrock$jumped = BedrockAuthInput.takeJumped();
+    }
+
+    /**
+     * Start jumping only goes with a jump, see {@link BedrockAuthInput#takeJumped()}.
+     */
+    @WrapWithCondition(method = "lambda$register$18", at = @At(value = "INVOKE", target = "Lnet/raphimc/viabedrock/api/model/entity/ClientPlayerEntity;addAuthInputData(Lnet/raphimc/viabedrock/protocol/data/enums/bedrock/generated/PlayerAuthInputData;)V"))
+    private static boolean startJumpingOnlyWithJump(final ClientPlayerEntity player, final PlayerAuthInputData data) {
+        return data != PlayerAuthInputData.StartJumping || viaFabricPlusBedrock$jumped;
     }
 
 }

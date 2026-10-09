@@ -47,4 +47,21 @@ public final class BedrockAuthInput {
         return velocity;
     }
 
+    // Whether the player jumped since the last input, set on the render thread
+    private static volatile boolean jumped;
+
+    public static void onJump() {
+        jumped = true;
+    }
+
+    /**
+     * The Bedrock client only says it starts jumping in the tick it jumps, as recorded on The Hive. ViaBedrock said so
+     * whenever the jump key was held on the ground, also while Java waits between jumps with the key held.
+     */
+    public static boolean takeJumped() {
+        final boolean wasJumped = jumped;
+        jumped = false;
+        return wasJumped;
+    }
+
 }

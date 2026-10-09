@@ -23,6 +23,7 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.features.movement;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.building.BedrockAuthInput;
 import com.viaversion.viafabricplus.bedrock.building.BedrockDimensionChange;
 import com.viaversion.viafabricplus.bedrock.building.BedrockImmobile;
 import com.viaversion.viafabricplus.bedrock.building.BedrockSprint;
@@ -77,6 +78,13 @@ public abstract class MixinLivingEntity {
         } else if ((Object) this == Minecraft.getInstance().player && BedrockImmobile.takeTeleported()
             && ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
             ci.cancel();
+        }
+    }
+
+    @Inject(method = "jumpFromGround", at = @At("HEAD"))
+    private void rememberJump(final CallbackInfo ci) {
+        if ((Object) this == Minecraft.getInstance().player) {
+            BedrockAuthInput.onJump();
         }
     }
 
