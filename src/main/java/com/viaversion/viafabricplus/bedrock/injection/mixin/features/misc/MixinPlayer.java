@@ -57,4 +57,16 @@ public abstract class MixinPlayer {
         }
     }
 
+    /**
+     * Bedrock reaches entities 3 blocks away, 5 in creative. Java gets the creative range from the server, which
+     * ViaBedrock doesn't send, so it stayed at 3 in creative.
+     */
+    @Inject(method = "entityInteractionRange", at = @At("HEAD"), cancellable = true)
+    private void bedrockAttackRange(final CallbackInfoReturnable<Double> cir) {
+        final Player player = (Player) (Object) this;
+        if (player instanceof LocalPlayer && BedrockBuilding.isActive()) {
+            cir.setReturnValue(player.hasInfiniteMaterials() ? BedrockBuilding.CREATIVE_ATTACK_RANGE : BedrockBuilding.SURVIVAL_ATTACK_RANGE);
+        }
+    }
+
 }
