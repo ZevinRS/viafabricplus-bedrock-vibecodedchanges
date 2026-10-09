@@ -21,7 +21,11 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.access;
 
+import com.google.common.collect.BiMap;
+import com.viaversion.viaversion.libs.fastutil.ints.Int2IntMap;
 import java.util.List;
+import net.raphimc.viabedrock.api.model.BlockState;
+import net.raphimc.viabedrock.protocol.model.BlockProperties;
 
 public interface IBlockStateRewriter {
 
@@ -29,5 +33,17 @@ public interface IBlockStateRewriter {
      * @return the names of the blocks the server defined, in the order the Bedrock client numbers them
      */
     List<String> viaFabricPlusBedrock$getCustomBlocks();
+
+    BlockProperties[] viaFabricPlusBedrock$getBlockProperties();
+
+    /**
+     * @return ViaBedrock's Bedrock block states and their runtime ids
+     */
+    BiMap<BlockState, Integer> viaFabricPlusBedrock$getBedrockStates();
+
+    /**
+     * @return ViaBedrock's Java block state of every Bedrock runtime id
+     */
+    Int2IntMap viaFabricPlusBedrock$getJavaStates();
 
 }

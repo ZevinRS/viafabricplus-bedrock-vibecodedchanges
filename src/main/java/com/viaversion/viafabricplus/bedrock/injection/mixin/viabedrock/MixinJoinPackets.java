@@ -25,6 +25,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.viaversion.viafabricplus.bedrock.block.BedrockCustomBlockMapping;
+import com.viaversion.viafabricplus.bedrock.injection.access.IBlockStateRewriter;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.libs.fastutil.ints.IntIntImmutablePair;
 import com.viaversion.viaversion.libs.fastutil.ints.IntIntPair;
@@ -51,14 +52,14 @@ public abstract class MixinJoinPackets {
     }
 
     /**
-     * Makes the models of the blocks the server defined, once ViaBedrock built the block palette from them, see
-     * {@link BedrockCustomBlockMapping}.
+     * Gives the blocks the server defined blocks of their own and makes their models, once ViaBedrock built the block
+     * palette from them, see {@link BedrockCustomBlockMapping}.
      */
     @WrapOperation(method = "lambda$register$7", at = @At(value = "NEW", target = "net/raphimc/viabedrock/protocol/rewriter/BlockStateRewriter"))
     private static BlockStateRewriter makeCustomBlockModels(final BlockProperties[] blockProperties, final boolean hashedRuntimeBlockIds, final Operation<BlockStateRewriter> original,
                                                             @Local(argsOnly = true) final PacketWrapper wrapper) {
         final BlockStateRewriter blockStateRewriter = original.call(blockProperties, hashedRuntimeBlockIds);
-        BedrockCustomBlockMapping.onPaletteBuilt(wrapper.user());
+        BedrockCustomBlockMapping.onPaletteBuilt(wrapper.user(), (IBlockStateRewriter) blockStateRewriter);
         return blockStateRewriter;
     }
 

@@ -25,7 +25,6 @@ import com.google.common.collect.BiMap;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
-import com.viaversion.viafabricplus.bedrock.block.BedrockCustomBlockMapping;
 import com.viaversion.viafabricplus.bedrock.injection.access.IBlockStateRewriter;
 import com.viaversion.viaversion.libs.fastutil.ints.Int2IntMap;
 import java.util.Arrays;
@@ -68,7 +67,25 @@ public abstract class MixinBlockStateRewriter implements IBlockStateRewriter {
     @Inject(method = "<init>", at = @At("TAIL"))
     private void rememberCustomBlocks(final BlockProperties[] blockProperties, final boolean hashedRuntimeBlockIds, final CallbackInfo ci) {
         this.viaFabricPlusBedrock$customBlocks = Arrays.stream(blockProperties).map(BlockProperties::name).toList();
-        BedrockCustomBlockMapping.assign(blockProperties, this.blockStateMappings, this.blockStateIdMappings);
+        this.viaFabricPlusBedrock$blockProperties = blockProperties;
+    }
+
+    @Unique
+    private BlockProperties[] viaFabricPlusBedrock$blockProperties = new BlockProperties[0];
+
+    @Override
+    public BlockProperties[] viaFabricPlusBedrock$getBlockProperties() {
+        return this.viaFabricPlusBedrock$blockProperties;
+    }
+
+    @Override
+    public BiMap<BlockState, Integer> viaFabricPlusBedrock$getBedrockStates() {
+        return this.blockStateMappings;
+    }
+
+    @Override
+    public Int2IntMap viaFabricPlusBedrock$getJavaStates() {
+        return this.blockStateIdMappings;
     }
 
     @Override
@@ -96,7 +113,7 @@ public abstract class MixinBlockStateRewriter implements IBlockStateRewriter {
 
     /**
      * The blocks for the blocks servers define aren't vanilla blocks with a waterlogged property, see
-     * {@link BedrockCustomBlockMapping}.
+     * {@link com.viaversion.viafabricplus.bedrock.block.BedrockCustomBlockMapping}.
      */
     @Inject(method = "waterlog", at = @At("HEAD"), cancellable = true)
     private void dontWaterlogCustomBlocks(final int javaBlockStateId, final CallbackInfoReturnable<Integer> cir) {

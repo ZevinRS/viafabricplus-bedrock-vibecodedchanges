@@ -31,12 +31,14 @@ import java.util.Map;
 import java.util.WeakHashMap;
 import net.raphimc.viabedrock.api.resourcepack.ResourcePack;
 import net.raphimc.viabedrock.protocol.storage.ResourcePackStorage;
+import org.cube.converter.model.impl.bedrock.BedrockGeometryModel;
+import org.cube.converter.parser.bedrock.geometry.BedrockGeometryParser;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * The parts of a server's resource packs ViaBedrock doesn't keep: client entity descriptions with their animations,
- * animations and animation controllers, the blocks of blocks.json and the block textures of terrain_texture.json, with
- * packs higher in the stack replacing lower ones.
+ * animations and animation controllers, the blocks of blocks.json, the block textures of terrain_texture.json and the
+ * geometries outside models/entity/, with packs higher in the stack replacing lower ones.
  */
 public final class BedrockPackIndex {
 
@@ -47,8 +49,11 @@ public final class BedrockPackIndex {
     private final Map<String, JsonObject> animationControllers = new HashMap<>();
     private final Map<String, JsonObject> blocks = new HashMap<>();
     private final Map<String, String> terrainTextures = new HashMap<>();
+    private final ResourcePackStorage storage;
+    private Map<String, BedrockGeometryModel> geometries;
 
     private BedrockPackIndex(final ResourcePackStorage storage) {
+        this.storage = storage;
         for (final ResourcePack pack : storage.getPackStackBottomToTop()) {
             for (final String path : pack.content().getFilesDeep("entity/", ".json")) {
                 final JsonObject description = object(object(read(pack, path), "minecraft:client_entity"), "description");
@@ -103,6 +108,51 @@ public final class BedrockPackIndex {
      */
     public @Nullable JsonObject block(final String identifier) {
         return this.blocks.get(identifier);
+    }
+
+    /**
+     * Full blocks without components for their look, like The Hive's bricks, have their textures in blocks.json: one
+     * for all faces or one per face.
+     *
+     * @return the texture short names by face, * for all faces
+     */
+    public Map<String, String> blockTextures(final String identifier) {
+        final Map<String, String> textures = new HashMap<>();
+        final JsonObject block = this.blocks.get(identifier);
+        if (block != null && block.get("textures") instanceof final JsonElement blockTextures) {
+            if (blockTextures.isJsonPrimitive()) {
+                textures.put("*", blockTextures.getAsString());
+            } else if (blockTextures instanceof final JsonObject faces) {
+                for (final Map.Entry<String, JsonElement> face : faces.entrySet()) {
+                    if (face.getValue().isJsonPrimitive()) {
+                        textures.put(face.getKey(), face.getValue().getAsString());
+                    }
+                }
+            }
+        }
+        return textures;
+    }
+
+    /**
+     * ViaBedrock only keeps the geometries of models/entity/, while blocks have theirs in models/blocks/ and the like.
+     *
+     * @return the geometry of any model file, parsed on the first call
+     */
+    public synchronized @Nullable BedrockGeometryModel geometry(final String identifier) {
+        if (this.geometries == null) {
+            this.geometries = new HashMap<>();
+            for (final ResourcePack pack : this.storage.getPackStackBottomToTop()) {
+                for (final String path : pack.content().getFilesDeep("models/", ".json")) {
+                    try {
+                        for (final BedrockGeometryModel geometry : BedrockGeometryParser.parse(pack.content().getString(path))) {
+                            this.geometries.put(geometry.getIdentifier(), geometry);
+                        }
+                    } catch (final Throwable ignored) { // ViaBedrock already warns about the ones it can't parse
+                    }
+                }
+            }
+        }
+        return this.geometries.get(identifier);
     }
 
     /**

@@ -24,7 +24,6 @@ package com.viaversion.viafabricplus.bedrock.resourcepack;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.block.BedrockCustomBlockDefinition;
 import com.viaversion.viafabricplus.bedrock.block.BedrockCustomBlocks;
-import com.viaversion.viaversion.libs.gson.JsonElement;
 import com.viaversion.viaversion.libs.gson.JsonObject;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -104,7 +103,7 @@ public final class BedrockCustomBlockPack {
         final String model = BedrockCustomBlocks.NAMESPACE + ":block/" + path;
         final String assets = "assets/" + BedrockCustomBlocks.NAMESPACE + "/";
 
-        final Map<String, String> shortNames = definition.textures().isEmpty() ? blocksJsonTextures(packs, definition.name()) : definition.textures();
+        final Map<String, String> shortNames = definition.textures().isEmpty() ? BedrockPackIndex.of(packs).blockTextures(definition.name()) : definition.textures();
         final Map<Direction, String> faceTextures = new EnumMap<>(Direction.class);
         for (final Direction direction : Direction.values()) {
             final String texture = texture(content, packs, textures, faceTexture(shortNames, direction));
@@ -113,7 +112,7 @@ public final class BedrockCustomBlockPack {
 
         JsonObject blockModel = null;
         if (definition.geometry() != null) {
-            final BedrockGeometryModel geometry = packs.getModels().getEntityModel(definition.geometry());
+            final BedrockGeometryModel geometry = BedrockPackIndex.of(packs).geometry(definition.geometry());
             if (geometry != null) {
                 blockModel = geometry.toJavaItemModel(faceTextures, RotationType.POST_1_21_11).compile();
                 blockModel.remove("display");
@@ -156,27 +155,6 @@ public final class BedrockCustomBlockPack {
         final String nameKey = "tile." + definition.name() + ".name";
         final String name = packs.getTexts().get(nameKey);
         lang.addProperty(block.getDescriptionId(), name.equals(nameKey) ? definition.name() : name);
-    }
-
-    /**
-     * Full blocks without components for their look, like The Hive's bricks, have their textures in the packs'
-     * blocks.json: one for all faces or one per face.
-     */
-    private static Map<String, String> blocksJsonTextures(final ResourcePackStorage packs, final String name) {
-        final Map<String, String> textures = new HashMap<>();
-        final JsonObject block = BedrockPackIndex.of(packs).block(name);
-        if (block != null && block.get("textures") instanceof final JsonElement blockTextures) {
-            if (blockTextures.isJsonPrimitive()) {
-                textures.put("*", blockTextures.getAsString());
-            } else if (blockTextures instanceof final JsonObject faces) {
-                for (final Map.Entry<String, JsonElement> face : faces.entrySet()) {
-                    if (face.getValue().isJsonPrimitive()) {
-                        textures.put(face.getKey(), face.getValue().getAsString());
-                    }
-                }
-            }
-        }
-        return textures;
     }
 
     /**

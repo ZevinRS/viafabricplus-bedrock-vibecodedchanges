@@ -31,6 +31,7 @@ import org.jetbrains.annotations.Nullable;
  * @param name          the Bedrock block identifier, like hive:anchor
  * @param geometry      the identifier of its model in the packs, or null for a full block
  * @param textures      the texture short names by face: *, up, down, north, south, east, west, side, or a material name
+ * @param renderMethod  how its material is drawn, like opaque or alpha_test, or null if it has none
  * @param rotation      the rotation of the model around x, y and z in degrees
  * @param collision     the shape players collide with
  * @param outline       the shape that's targeted
@@ -39,6 +40,6 @@ import org.jetbrains.annotations.Nullable;
  * @param lightEmission the light it gives off
  * @param lightFilter   how much light it takes away when passing through, from 0 to 15
  */
-public record BedrockCustomBlockDefinition(String name, @Nullable String geometry, Map<String, String> textures, float[] rotation, VoxelShape collision,
+public record BedrockCustomBlockDefinition(String name, @Nullable String geometry, Map<String, String> textures, @Nullable String renderMethod, float[] rotation, VoxelShape collision,
                                            VoxelShape outline, float friction, float destroyTime, int lightEmission, int lightFilter) {
 }

@@ -85,11 +85,15 @@ public final class BedrockCustomBlockDefinitions {
         }
 
         final Map<String, String> textures = new LinkedHashMap<>();
+        String renderMethod = null;
         if (components.get("minecraft:material_instances") instanceof final CompoundTag materialInstances
             && materialInstances.get("materials") instanceof final CompoundTag materials) {
             for (final Map.Entry<String, Tag> material : materials.entrySet()) {
                 if (material.getValue() instanceof final CompoundTag instance && instance.getString("texture", null) != null) {
                     textures.put(material.getKey(), instance.getString("texture"));
+                    if (renderMethod == null || material.getKey().equals("*")) {
+                        renderMethod = instance.getString("render_method", null);
+                    }
                 }
             }
         }
@@ -107,7 +111,7 @@ public final class BedrockCustomBlockDefinitions {
         final float destroyTime = components.get("minecraft:destructible_by_mining") instanceof final CompoundTag destructible ? destructible.getFloat("value", 0F) : 0F;
         final int lightEmission = components.get("minecraft:light_emission") instanceof final CompoundTag light ? light.getInt("emission", 0) : 0;
         final int lightFilter = components.get("minecraft:block_light_filter") instanceof final CompoundTag filter ? filter.getInt("lightLevel", 15) : 15;
-        return new BedrockCustomBlockDefinition(name, geometry, textures, rotation, collision, outline, friction, destroyTime, lightEmission, lightFilter);
+        return new BedrockCustomBlockDefinition(name, geometry, textures, renderMethod, rotation, collision, outline, friction, destroyTime, lightEmission, lightFilter);
     }
 
     /**

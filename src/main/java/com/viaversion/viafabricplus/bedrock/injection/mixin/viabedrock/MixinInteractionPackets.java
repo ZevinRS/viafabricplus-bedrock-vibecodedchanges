@@ -53,7 +53,9 @@ public abstract class MixinInteractionPackets {
      */
     @Inject(method = "lambda$register$3", at = @At("HEAD"), cancellable = true)
     private static void skipLinksToUnknownEntities(final PacketWrapper wrapper, final CallbackInfo ci) {
+        // Read ahead: written values are read again after resetting the reader
         final EntityLink link = wrapper.read(BedrockTypes.ENTITY_LINK);
+        wrapper.write(BedrockTypes.ENTITY_LINK, link);
         wrapper.resetReader();
         final EntityTracker entityTracker = wrapper.user().get(EntityTracker.class);
         final Entity vehicle = entityTracker.getEntityByUid(link.fromEntityUniqueId());
