@@ -36,6 +36,10 @@ import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import com.viaversion.viafabricplus.bedrock.building.BedrockPlacementState;
+import com.viaversion.viafabricplus.bedrock.building.BedrockPlacementTranslator;
+import net.raphimc.viabedrock.api.model.entity.ClientPlayerEntity;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.PlayerActionType;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
@@ -85,6 +89,21 @@ public abstract class MixinClientPlayerPackets {
     private static void keepSprintingFlagWhileLoading(final PacketWrapper wrapper, final CallbackInfo ci) {
         if (BedrockDimensionChange.sendsSprinting()) {
             wrapper.user().get(EntityTracker.class).getClientPlayer().addAuthInputData(PlayerAuthInputData.Sprinting);
+        }
+    }
+
+    /**
+     * The Bedrock client aborts the block it broke last once it stops attacking, see {@link MixinBlockBreakActions}:
+     * then no block was cracked in the tick.
+     */
+    @Inject(method = "lambda$register$18", at = @At("HEAD"))
+    private static void abortBrokenBlockAfterAttack(final PacketWrapper wrapper, final CallbackInfo ci) {
+        final BedrockPlacementState state = BedrockPlacementTranslator.state(wrapper.user());
+        final boolean cracked = state.consumeCrackedThisTick();
+        if (state.brokenPosition() != null && !cracked) {
+            wrapper.user().get(EntityTracker.class).getClientPlayer().addAuthInputBlockAction(
+                new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.AbortDestroyBlock, state.brokenPosition(), 0));
+            state.setBrokenPosition(null);
         }
     }
 

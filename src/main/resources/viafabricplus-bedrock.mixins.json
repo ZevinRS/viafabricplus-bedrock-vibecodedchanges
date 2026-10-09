@@ -66,6 +66,7 @@
     "features.movement.MixinLocalPlayer",
     "features.movement.MixinPlayer",
     "viabedrock.MixinBedrockProtocol",
+    "viabedrock.MixinBlockBreakActions",
     "viabedrock.MixinBlockStateRewriter",
     "viabedrock.MixinChunkTracker",
     "viabedrock.MixinClientPlayerPackets",

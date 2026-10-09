@@ -30,6 +30,10 @@ import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ServerboundPackets26_3;
 import java.util.List;
 import java.util.Locale;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.raphimc.viabedrock.api.model.container.player.InventoryContainer;
 import net.raphimc.viabedrock.api.model.entity.ClientPlayerEntity;
 import net.raphimc.viabedrock.api.util.PacketFactory;
@@ -404,11 +408,20 @@ public final class BedrockPlacementTranslator {
         wrapper.write(BedrockTypes.FLOAT_LE, 0F); // data
         wrapper.write(BedrockTypes.OPTIONAL_STRING, ActorSwingSource.Attack.name().toLowerCase(Locale.ROOT)); // swing source
 
+        final boolean serverAuthoritative = wrapper.user().get(GameSessionStorage.class).isBlockBreakingServerAuthoritative();
         if (clientPlayer.blockBreakingInfo() != null) {
-            if (!wrapper.user().get(GameSessionStorage.class).isBlockBreakingServerAuthoritative()) {
+            if (!serverAuthoritative) {
                 final ClientPlayerEntity.BlockBreakingInfo blockBreakingInfo = clientPlayer.blockBreakingInfo();
                 clientPlayer.addAuthInputBlockAction(new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.CrackBlock, blockBreakingInfo.position(), blockBreakingInfo.direction().ordinal()));
+                state(wrapper.user()).setCrackedThisTick();
             }
+        } else if (!serverAuthoritative && state(wrapper.user()).brokenPosition() != null
+            && Minecraft.getInstance().hitResult instanceof final BlockHitResult hit && hit.getType() == HitResult.Type.BLOCK) {
+            // Bedrock keeps cracking the block it aims at in the cooldown after breaking one, without starting to break it
+            final BlockPos pos = hit.getBlockPos();
+            clientPlayer.addAuthInputBlockAction(new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.CrackBlock,
+                new BlockPosition(pos.getX(), pos.getY(), pos.getZ()), hit.getDirection().ordinal()));
+            state(wrapper.user()).setCrackedThisTick();
         } else {
             clientPlayer.addAuthInputData(PlayerAuthInputData.MissedSwing);
         }

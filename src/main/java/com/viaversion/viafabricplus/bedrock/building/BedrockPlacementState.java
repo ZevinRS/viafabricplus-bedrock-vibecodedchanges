@@ -55,6 +55,32 @@ public final class BedrockPlacementState implements StorableObject {
         }
     };
 
+    // The block the client broke last, which Bedrock keeps cracking blocks after until it starts breaking the next one or
+    // the attack ends, then aborts it. Only with client authoritative block breaking.
+    private BlockPosition brokenPosition;
+    private boolean crackedThisTick;
+
+    public BlockPosition brokenPosition() {
+        return this.brokenPosition;
+    }
+
+    public void setBrokenPosition(final BlockPosition brokenPosition) {
+        this.brokenPosition = brokenPosition;
+    }
+
+    public void setCrackedThisTick() {
+        this.crackedThisTick = true;
+    }
+
+    /**
+     * @return whether a block was cracked since the last call
+     */
+    public boolean consumeCrackedThisTick() {
+        final boolean cracked = this.crackedThisTick;
+        this.crackedThisTick = false;
+        return cracked;
+    }
+
     public int nextLegacyRequestId() {
         final int id = this.nextLegacyRequestId;
         this.nextLegacyRequestId -= 2;
